@@ -52,11 +52,25 @@ function toggleDarkMode() {
 
 // 网格展开/收起功能
 function toggleGrid(btn) {
-    const grid = btn.closest('.nav-section').querySelector('.nav-grid');
+    const grid = btn.parentElement.nextElementSibling;
     const isCollapsed = grid.classList.contains('collapsed');
     
-    grid.classList.toggle('collapsed');
-    btn.textContent = isCollapsed ? '收起' : '展开更多';
+    // 计算所有子元素（包括网址和添加按钮）的数量
+    const totalItems = grid.children.length;
+    
+    // 如果总数小于等于5，不显示展开/收起按钮
+    if (totalItems <= 5) {
+        btn.style.display = 'none';
+    } else {
+        btn.style.display = 'block';
+        if (isCollapsed) {
+            grid.classList.remove('collapsed');
+            btn.textContent = '收起';
+        } else {
+            grid.classList.add('collapsed');
+            btn.textContent = '展开更多';
+        }
+    }
 }
 
 // 添加网址相关功能
@@ -332,6 +346,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初始化可编辑标题
     initEditableHeaders();
+
+    const sections = document.querySelectorAll('.nav-section');
+    sections.forEach(section => {
+        const grid = section.querySelector('.nav-grid');
+        const toggleBtn = section.querySelector('.toggle-btn');
+        const totalItems = grid.children.length;
+        
+        if (totalItems <= 5) {
+            toggleBtn.style.display = 'none';
+        } else {
+            toggleBtn.style.display = 'block';
+        }
+    });
 });
 
 // 全局变量
