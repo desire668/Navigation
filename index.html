@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>网址导航</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* 添加媒体查询以优化移动端显示 */
+        @media (max-width: 600px) {
+            .search-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .search-input, .search-button {
+                width: 100%;
+                margin: 5px 0;
+            }
+            .nav-grid {
+                flex-direction: column;
+            }
+            .nav-item {
+                font-size: 14px; /* 调整字体大小 */
+            }
+            .settings-dropdown {
+                width: 100%; /* 确保设置下拉菜单宽度适应屏幕 */
+            }
+        }
+    </style>
 </head>
 <body>
     <input type="file" id="wallpaperInput" accept="image/*" style="display: none;">
