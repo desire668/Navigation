@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网址导航</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <input type="file" id="wallpaperInput" accept="image/*" style="display: none;">
+    <div id="weather-widget" class="weather-widget" style="display: none;">
+        <span id="location"></span>
+        <span id="temperature"></span>
+        <span id="weather-desc"></span>
+    </div>
+    <button class="settings-btn" onclick="toggleSettings()">
+        ⚙️ 设置
+    </button>
+    <div class="settings-dropdown" id="settingsDropdown">
+        <div class="settings-item" onclick="document.getElementById('wallpaperInput').click()">
+            🖼️ 更换壁纸
+        </div>
+        <div class="settings-item" onclick="clearWallpaper()">
+            🗑️ 清除壁纸
+        </div>
+        <div class="settings-item" onclick="toggleDarkMode()">
+            <span id="darkModeIcon">🌞</span> <span id="darkModeText">切换夜间模式</span>
+        </div>
+        <div class="settings-item" onclick="toggleWeather()">
+            <span id="weatherIcon">🌤️</span> <span id="weatherText">显示天气</span>
+        </div>
+        <div class="settings-item" onclick="exportSettings()">
+            💾 导出配置
+        </div>
+        <div class="settings-item">
+            📂 导入配置
+            <input type="file" id="importInput" accept=".json" style="display: none;" onchange="importSettings(event)">
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div class="search-container">
+                <select class="search-engine-select" id="searchEngine">
+                    <option value="https://www.bing.com/search?q=">必应</option>
+                    <option value="https://www.google.com/search?q=">谷歌</option>
+                    <option value="https://www.baidu.com/s?wd=">百度</option>
+                    
+                </select>
+                <input type="text" class="search-input" id="searchInput" placeholder="输入关键词搜索...">
+                <button class="search-button" onclick="search()">搜索</button>
+            </div>
+        </header>
+
+        <section class="nav-section">
+            <div class="nav-section-header">
+                <h2>常用网址</h2>
+                <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
+            </div>
+            <div class="nav-grid collapsed">
+                <a href="https://desire666.us.kg/" class="nav-item" target="_blank">
+                    作者博客
+                </a>
+                <a href="https://kimi.moonshot.cn/" class="nav-item" target="_blank">
+                    kimi
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="https://www.github.com" class="nav-item" target="_blank">
+                    GitHub
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="https://www.bilibili.com" class="nav-item" target="_blank">
+                    哔哩哔哩
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <div class="add-site-btn" onclick="showAddSiteModal(this)">
+                    + 添加网址
+                </div>
+            </div>
+        </section>
+        <section class="nav-section">
+            <div class="nav-section-header">
+                <h2>实用工具</h2>
+                <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
+            </div>
+            <div class="nav-grid collapsed">
+                <a href="https://translate.google.com" class="nav-item" target="_blank">
+                    谷歌翻译
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <div class="add-site-btn" onclick="showAddSiteModal(this)">
+                    + 添加网址
+                </div>
+            </div>
+        </section>
+
+        <section class="nav-section">
+            <div class="nav-section-header">
+                <h2>学习资源</h2>
+                <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
+            </div>
+            <div class="nav-grid collapsed">
+                <a href="https://www.w3school.com.cn" class="nav-item" target="_blank">
+                    W3School
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <div class="add-site-btn" onclick="showAddSiteModal(this)">
+                    + 添加网址
+                </div>
+            </div>
+        </section>
+
+
+    </div>
+
+    <div class="modal" id="addSiteModal">
+        <div class="modal-content">
+            <h3>添加新网址</h3>
+            <input type="text" id="siteName" placeholder="网站名称">
+            <input type="url" id="siteUrl" placeholder="网站地址">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn confirm" onclick="addNewSite()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
