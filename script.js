@@ -58,8 +58,8 @@ function toggleGrid(btn) {
     // 计算所有子元素（包括网址和添加按钮）的数量
     const totalItems = grid.children.length;
     
-    // 如果总数小于等于5，不显示展开/收起按钮
-    if (totalItems <= 5) {
+    // 如果总数小于5，不显示展开/收起按钮
+    if (totalItems < 5) {
         btn.style.display = 'none';
     } else {
         btn.style.display = 'block';
@@ -301,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const grid = section.querySelector('.nav-grid');
         const totalItems = grid.children.length;
         
-        if (totalItems > 5) {
+        if (totalItems >= 5) {
             section.classList.add('has-more');
             grid.classList.add('collapsed');
         }
