@@ -140,7 +140,7 @@
                 <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
             </div>
             <div class="nav-grid collapsed">
-                <a href="folder1/QRcode.html" class="nav-item" target="_blank">
+                <a href="tools/QRcode.html" class="nav-item" target="_blank">
                     二维码生成识别
                     <button class="delete-btn" onclick="deleteSite(this, event)"></button>
                 </a>
@@ -177,28 +177,6 @@
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="closeModal()">取消</button>
                 <button class="modal-btn confirm" onclick="addNewSite()">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 添加AI助手图标和对话界面 -->
-    <div id="ai-assistant" class="ai-assistant">
-        <div class="ai-icon" id="ai-icon">🤖</div>
-        <div class="ai-chat-window" id="ai-chat-window">
-            <div class="chat-header">
-                <span>AI助手</span>
-                <button class="close-chat" onclick="toggleChat()">×</button>
-            </div>
-            <div class="chat-messages" id="chat-messages">
-                <!-- 消息会在这里动态添加 -->
-            </div>
-            <div class="chat-input-area">
-                <input type="file" id="chat-file-input" style="display: none;">
-                <button class="upload-btn" onclick="document.getElementById('chat-file-input').click()">
-                    📎
-                </button>
-                <input type="text" id="chat-input" placeholder="输入消息...">
-                <button class="send-btn" onclick="sendMessage()">发送</button>
             </div>
         </div>
     </div>
