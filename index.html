@@ -5,244 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>网址导航</title>
     <link rel="stylesheet" href="styles.css">
-    <script>
-        let isdevtoolsopen = false;
-        const starttime = Date.now();
-        checkdebugger();
-        function checkdebugger() {
-        debugger;// 当开发者工具打开且处于调试模式时，执行会暂停。
-        const endtime = Date.now();
-        if (endtime - starttime >100) { // 假设暂停超过100ms则判断为打开了开发者工具。
-            isdevtoolsopen = true;
-            window.close();
-            window.location = "about:blank";
-        }
-        }
-           let h = window.innerHeight;
-            let w = window.innerWidth;
-        
-            //禁用右键
-            document.oncontextmenu = function () { return false; };
-        
-            
-        
-            //禁用开发者工具F12
-            document.onkeydown = function () {
-                if (window.event && window.event.keyCode == 123) {
-                    event.keyCode = 0;
-                    event.returnValue = false;
-                    return false;
-                }
-                if (window.event.ctrlKey && window.event.shiftKey) {
-                     event.keyCode = 0;
-                    event.returnValue = false;
-                    return false;
-                }
-            };
-        
-            document.oncontextmenu = function () {
-                 event.keyCode = 0;
-                event.returnValue = false;
-                return false;
-            };
-            //如果用户在工具栏调起开发者工具，那么判断浏览器的可视高度和可视宽度是否有改变，如有改变则关闭本页面  
-            window.onresize = function () {
-                if (h != window.innerHeight || w != window.innerWidth) {
-                    window.close();
-                    window.location = "about:blank";
-                }
-            }
-    </script>
-    <style>
-        /* 添加媒体查询以优化移动端显示 */
-        @media (max-width: 600px) {
-            .search-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .search-input, .search-button {
-                width: 100%;
-                margin: 5px 0;
-            }
-            .nav-grid {
-                flex-direction: column;
-            }
-            .nav-item {
-                font-size: 14px; /* 调整字体大小 */
-            }
-            .settings-dropdown {
-                width: 100%; /* 确保设置下拉菜单宽度适应屏幕 */
-            }
-        }
-
-        /* AI助手图标样式 */
-        .ai-assistant-icon {
-            position: fixed;
-            right: 20px;
-            bottom: 20px;
-            width: 50px;
-            height: 50px;
-            background-color: #4CAF50;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 24px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-            transition: transform 0.2s;
-        }
-
-        .ai-assistant-icon:hover {
-            transform: scale(1.1);
-        }
-
-        /* AI聊天窗口样式 */
-        .ai-chat-container {
-            position: fixed;
-            right: 20px;
-            bottom: 80px;
-            width: 350px;
-            height: 500px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            display: none;
-            flex-direction: column;
-            z-index: 1000;
-        }
-
-        .ai-chat-header {
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 10px 10px 0 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .ai-chat-close {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-        }
-
-        .ai-chat-messages {
-            flex-grow: 1;
-            padding: 10px;
-            overflow-y: auto;
-        }
-
-        .ai-chat-input-area {
-            padding: 10px;
-            border-top: 1px solid #eee;
-            display: flex;
-            gap: 5px;
-        }
-
-        .ai-chat-input-area textarea {
-            flex-grow: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            resize: none;
-        }
-
-        .ai-upload-btn, .ai-send-btn {
-            padding: 8px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        /* 消息气泡样式 */
-        .message {
-            margin: 5px 0;
-            padding: 8px 12px;
-            border-radius: 15px;
-            max-width: 80%;
-            word-wrap: break-word;
-        }
-
-        .user-message {
-            background-color: #e3f2fd;
-            margin-left: auto;
-            border-radius: 15px 15px 0 15px;
-        }
-
-        .ai-message {
-            background-color: #f5f5f5;
-            margin-right: auto;
-            border-radius: 15px 15px 15px 0;
-        }
-
-        /* API Key 设置弹窗样式 */
-        .api-key-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 1001;
-        }
-
-        .api-key-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            width: 300px;
-        }
-
-        .api-key-content input {
-            width: 100%;
-            padding: 8px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .api-key-buttons {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .api-key-buttons button {
-            padding: 8px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .api-key-buttons button:first-child {
-            background-color: #4CAF50;
-            color: white;
-        }
-
-        .api-key-buttons button:last-child {
-            background-color: #f5f5f5;
-        }
-    </style>
 </head>
+<script>
+	let isdevtoolsopen = false;
+	const starttime = Date.now();
+	checkdebugger();
+	function checkdebugger() {
+	debugger;// 当开发者工具打开且处于调试模式时，执行会暂停。
+	const endtime = Date.now();
+	if (endtime - starttime >100) { // 假设暂停超过100ms则判断为打开了开发者工具。
+		isdevtoolsopen = true;
+	    window.close();
+	    window.location = "about:blank";
+	}
+	}
+	   let h = window.innerHeight;
+	    let w = window.innerWidth;
+	
+	    //禁用右键
+	    document.oncontextmenu = function () { return false; };
+	
+	    
+	
+	    //禁用开发者工具F12
+	    document.onkeydown = function () {
+	        if (window.event && window.event.keyCode == 123) {
+	            event.keyCode = 0;
+	            event.returnValue = false;
+	            return false;
+	        }
+	        if (window.event.ctrlKey && window.event.shiftKey) {
+	             event.keyCode = 0;
+				event.returnValue = false;
+	            return false;
+	        }
+	    };
+	
+	    document.oncontextmenu = function () {
+			 event.keyCode = 0;
+			event.returnValue = false;
+			return false;
+	    };
+	    //如果用户在工具栏调起开发者工具，那么判断浏览器的可视高度和可视宽度是否有改变，如有改变则关闭本页面  
+	    window.onresize = function () {
+	        if (h != window.innerHeight || w != window.innerWidth) {
+	            window.close();
+	            window.location = "about:blank";
+	        }
+	    }
+</script>
 <body>
     <input type="file" id="wallpaperInput" accept="image/*" style="display: none;">
     <div id="weather-widget" class="weather-widget" style="display: none;">
         <span id="location"></span>
         <span id="temperature"></span>
         <span id="weather-desc"></span>
+    </div>
+    <div id="game-recommendations" class="game-widget" style="display: none;">
+        <div class="game-list" id="gameList">
+            <!-- 游戏会动态添加到这里 -->
+        </div>
     </div>
     <button class="settings-btn" onclick="toggleSettings()">
         ⚙️ 设置
@@ -256,6 +78,9 @@
         </div>
         <div class="settings-item" onclick="toggleDarkMode()">
             <span id="darkModeIcon">🌞</span> <span id="darkModeText">切换夜间模式</span>
+        </div>
+        <div class="settings-item" onclick="toggleSystemTheme()">
+            <span id="systemThemeIcon">🌗</span> <span id="systemThemeText">跟随系统</span>
         </div>
         <div class="settings-item" onclick="toggleWeather()">
             <span id="weatherIcon">🌤️</span> <span id="weatherText">显示天气</span>
@@ -315,8 +140,8 @@
                 <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
             </div>
             <div class="nav-grid collapsed">
-                <a href="https://translate.google.com" class="nav-item" target="_blank">
-                    谷歌翻译
+                <a href="folder1/QRcode.html" class="nav-item" target="_blank">
+                    二维码生成识别
                     <button class="delete-btn" onclick="deleteSite(this, event)"></button>
                 </a>
                 <div class="add-site-btn" onclick="showAddSiteModal(this)">
@@ -356,7 +181,28 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- 添加AI助手图标和对话界面 -->
+    <div id="ai-assistant" class="ai-assistant">
+        <div class="ai-icon" id="ai-icon">🤖</div>
+        <div class="ai-chat-window" id="ai-chat-window">
+            <div class="chat-header">
+                <span>AI助手</span>
+                <button class="close-chat" onclick="toggleChat()">×</button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <!-- 消息会在这里动态添加 -->
+            </div>
+            <div class="chat-input-area">
+                <input type="file" id="chat-file-input" style="display: none;">
+                <button class="upload-btn" onclick="document.getElementById('chat-file-input').click()">
+                    📎
+                </button>
+                <input type="text" id="chat-input" placeholder="输入消息...">
+                <button class="send-btn" onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+    </div>
 
+    <script src="script.js"></script>
 </body>
 </html>
