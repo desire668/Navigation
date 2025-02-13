@@ -379,7 +379,13 @@
 </head>
 <body>
     <div id="chat-container">
-        <div id="chat-history"></div>
+        <div id="chat-history">
+            <div id="welcome-message" style="padding: 20px; text-align: center; color: #666;">
+                <p>欢迎使用 DeepSeek API Demo</p>
+                <p>如果您还没有 API Key，可以从以下链接获取（免费）：</p>
+                <p><a href="https://cloud.siliconflow.cn/i/QynoKRBH" target="_blank" style="color: #1a73e8; text-decoration: none;">https://cloud.siliconflow.cn/i/QynoKRBH</a></p>
+            </div>
+        </div>
         <div class="bottom-container">
             <select id="model-select">
                 <!-- 模型列表将在这里动态生成 -->
@@ -747,8 +753,13 @@
             
             loadCustomModels();
 
+            // 根据是否有API Key来显示或隐藏欢迎信息
+            const welcomeMessage = document.getElementById('welcome-message');
             if (!apiKey) {
+                welcomeMessage.style.display = 'block';
                 displayError('请先在设置中配置API Key');
+            } else {
+                welcomeMessage.style.display = 'none';
             }
         }
 
