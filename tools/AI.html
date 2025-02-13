@@ -323,6 +323,58 @@
         .add-model:hover {
             background: #f1f8ff;
         }
+
+        /* 添加思考过程相关样式 */
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            cursor: pointer;
+            padding: 8px 0;
+        }
+
+        .thinking-header .arrow {
+            transition: transform 0.2s;
+            width: 16px;
+            height: 16px;
+        }
+
+        .thinking-header.collapsed .arrow {
+            transform: rotate(-90deg);
+        }
+
+        .thinking-content {
+            display: none;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+
+        .thinking-content.expanded {
+            display: block;
+        }
+
+        .thinking-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .thinking-status .dot {
+            width: 6px;
+            height: 6px;
+            background-color: #666;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>
@@ -450,9 +502,26 @@
             messageDiv.appendChild(messageContent);
             messageDiv.appendChild(copyButton);
             chatHistory.appendChild(messageDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            // 检查是否需要自动滚动
+            const shouldAutoScroll = isNearBottom();
+            if (shouldAutoScroll) {
+                scrollToBottom();
+            }
             
             return messageDiv;
+        }
+
+        // 添加检查是否接近底部的函数
+        function isNearBottom() {
+            const threshold = 100; // 距离底部的阈值（像素）
+            const distanceToBottom = chatHistory.scrollHeight - chatHistory.scrollTop - chatHistory.clientHeight;
+            return distanceToBottom <= threshold;
+        }
+
+        // 添加滚动到底部的函数
+        function scrollToBottom() {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         function displayError(message) {
@@ -460,7 +529,12 @@
             errorDiv.className = 'message error-message';
             errorDiv.innerHTML = `<strong>错误:</strong> ${message}`;
             chatHistory.appendChild(errorDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
+            
+            // 检查是否需要自动滚动
+            const shouldAutoScroll = isNearBottom();
+            if (shouldAutoScroll) {
+                scrollToBottom();
+            }
         }
 
         async function sendMessage(apiKey, message, model) {
@@ -476,6 +550,32 @@
             const assistantDiv = displayMessage('assistant', '');
             const contentDiv = assistantDiv.querySelector('.content');
             let fullContent = '';
+            let reasoningContent = '';  // 用于存储思维链内容
+
+            // 创建思考过程容器
+            const thinkingHeader = document.createElement('div');
+            thinkingHeader.className = 'thinking-header collapsed';
+            thinkingHeader.style.display = 'none';  // 默认隐藏，有思维链时才显示
+            thinkingHeader.innerHTML = `
+                <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 9l-7 7-7-7"/>
+                </svg>
+                <div class="thinking-status">
+                    <span>思考过程</span>
+                </div>
+            `;
+
+            const thinkingContentDiv = document.createElement('div');
+            thinkingContentDiv.className = 'thinking-content';
+
+            // 添加点击展开/折叠功能
+            thinkingHeader.addEventListener('click', () => {
+                thinkingHeader.classList.toggle('collapsed');
+                thinkingContentDiv.classList.toggle('expanded');
+            });
+
+            contentDiv.appendChild(thinkingHeader);
+            contentDiv.appendChild(thinkingContentDiv);
 
             // 构造请求体
             const requestBody = {
@@ -513,9 +613,8 @@
                     
                     buffer += decoder.decode(value, {stream: true});
                     
-                    // 处理缓冲区中的完整数据行
                     const lines = buffer.split('\n');
-                    buffer = lines.pop() || ''; // 保留最后一个不完整的行
+                    buffer = lines.pop() || '';
 
                     for (const line of lines) {
                         if (line.trim() === '') continue;
@@ -523,10 +622,37 @@
                         
                         try {
                             const data = JSON.parse(line.replace(/^data: /, ''));
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                fullContent += data.choices[0].delta.content;
-                                contentDiv.innerHTML = marked.parse(fullContent);
-                                chatHistory.scrollTop = chatHistory.scrollHeight;
+                            if (data.choices && data.choices[0].delta) {
+                                const delta = data.choices[0].delta;
+
+                                // 处理思维链内容
+                                if (delta.reasoning_content) {
+                                    if (thinkingHeader.style.display === 'none') {
+                                        thinkingHeader.style.display = 'flex';
+                                    }
+                                    reasoningContent += delta.reasoning_content;
+                                    thinkingContentDiv.innerHTML = marked.parse(reasoningContent);
+                                }
+
+                                // 处理最终回答
+                                if (delta.content) {
+                                    fullContent += delta.content;
+                                    const answerDiv = document.createElement('div');
+                                    answerDiv.className = 'answer';
+                                    answerDiv.innerHTML = marked.parse(fullContent);
+                                    
+                                    // 确保回答显示在思考过程之后
+                                    if (contentDiv.querySelector('.answer')) {
+                                        contentDiv.querySelector('.answer').remove();
+                                    }
+                                    contentDiv.appendChild(answerDiv);
+                                }
+
+                                // 检查是否需要自动滚动
+                                const shouldAutoScroll = isNearBottom();
+                                if (shouldAutoScroll) {
+                                    scrollToBottom();
+                                }
                             }
                         } catch (e) {
                             console.error('解析响应数据失败:', e);
