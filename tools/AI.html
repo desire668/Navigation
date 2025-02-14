@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>AI助手</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
@@ -375,6 +376,140 @@
             50% { opacity: 1; }
             100% { opacity: 0.3; }
         }
+
+        /* 添加移动端适配样式 */
+        @media screen and (max-width: 768px) {
+            body {
+                padding: 0;
+            }
+
+            #chat-container {
+                height: 100vh;
+                max-width: 100%;
+                border-radius: 0;
+            }
+
+            .message {
+                padding: 0 10px;
+            }
+
+            .message-content {
+                padding-right: 30px;
+            }
+
+            .bottom-container {
+                padding: 10px;
+            }
+
+            #message-input {
+                font-size: 16px; /* 防止iOS自动放大输入框 */
+            }
+
+            /* 调整模态框在移动端的样式 */
+            .modal-content {
+                width: 95%;
+                margin: 10px;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+
+            /* 调整按钮在移动端的大小 */
+            .tool-button {
+                padding: 8px;
+            }
+
+            #send-button {
+                padding: 8px 12px;
+            }
+
+            /* 调整代码块在移动端的显示 */
+            .message pre {
+                padding: 12px;
+                font-size: 14px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* 优化移动端的滚动体验 */
+            #chat-history {
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* 调整设置面板中的输入框和按钮 */
+            .form-group input {
+                font-size: 16px;
+                padding: 10px;
+            }
+
+            .modal-footer button {
+                padding: 10px 16px;
+            }
+
+            /* 优化移动端的复制按钮 */
+            .copy-button {
+                padding: 8px;
+                opacity: 1; /* 在移动端始终显示复制按钮 */
+            }
+
+            /* 调整模型选择下拉框 */
+            #model-select {
+                font-size: 16px;
+                padding: 10px;
+            }
+        }
+
+        /* 添加图片预览相关样式 */
+        .image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 0 12px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .remove-image {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+        }
+
+        .remove-image:hover {
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        @media screen and (max-width: 768px) {
+            .image-preview-item {
+                width: 60px;
+                height: 60px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -390,6 +525,7 @@
             <select id="model-select">
                 <!-- 模型列表将在这里动态生成 -->
             </select>
+            <div class="image-preview-container" id="image-preview-container"></div>
             <div class="input-container">
                 <textarea id="message-input" placeholder="输入消息..." rows="1"></textarea>
             </div>
@@ -672,18 +808,19 @@
             }
         }
 
-        // 事件监听
-        sendButton.addEventListener('click', () => {
-            const message = messageInput.value;
-            const model = modelSelect.value;
-            if (message.trim()) {
-                sendMessage(apiKey, message, model);
-                messageInput.value = '';
-            }
+        // 添加图片预览相关变量
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        let uploadedImages = [];
+
+        // 添加上传按钮点击事件
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
         });
 
+        // 添加输入框事件监听
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendButton.click();
             }
         });
@@ -694,11 +831,7 @@
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // 处理文件上传
-        uploadButton.addEventListener('click', () => {
-            fileInput.click();
-        });
-
+        // 修改文件上传处理
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -716,18 +849,61 @@
                     reader.readAsDataURL(file);
                 });
 
-                // 将图片添加到输入框
-                const imageMarkdown = `![${file.name}](${base64})`;
-                messageInput.value += (messageInput.value ? '\n' : '') + imageMarkdown;
+                // 创建预览元素
+                const previewItem = document.createElement('div');
+                previewItem.className = 'image-preview-item';
                 
+                const img = document.createElement('img');
+                img.src = base64;
+                
+                const removeButton = document.createElement('button');
+                removeButton.className = 'remove-image';
+                removeButton.innerHTML = '×';
+                removeButton.onclick = () => {
+                    previewItem.remove();
+                    uploadedImages = uploadedImages.filter(img => img.base64 !== base64);
+                };
+
+                previewItem.appendChild(img);
+                previewItem.appendChild(removeButton);
+                imagePreviewContainer.appendChild(previewItem);
+
+                // 保存图片信息
+                uploadedImages.push({
+                    name: file.name,
+                    base64: base64
+                });
+
                 // 重置文件输入框
                 fileInput.value = '';
-                
-                // 触发输入框的高度调整
-                messageInput.dispatchEvent(new Event('input'));
             } catch (error) {
                 console.error('文件处理失败:', error);
                 displayError('文件处理失败');
+            }
+        });
+
+        // 修改发送消息函数
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value;
+            const model = modelSelect.value;
+            
+            if (message.trim() || uploadedImages.length > 0) {
+                // 构建完整消息，包含文本和图片
+                let fullMessage = message;
+                
+                // 添加图片到消息
+                if (uploadedImages.length > 0) {
+                    fullMessage += '\n' + uploadedImages
+                        .map(img => `![${img.name}](${img.base64})`)
+                        .join('\n');
+                }
+
+                sendMessage(apiKey, fullMessage, model);
+                messageInput.value = '';
+                
+                // 清空图片预览
+                imagePreviewContainer.innerHTML = '';
+                uploadedImages = [];
             }
         });
 
