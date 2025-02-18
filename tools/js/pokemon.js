@@ -129,7 +129,9 @@ const versionTranslations = {
     'ultra-sun': '究极之日',
     'ultra-moon': '究极之月',
     'sword': '剑',
-    'shield': '盾'
+    'shield': '盾',
+    'scarlet': '朱',
+    'violet': '紫'
 };
 
 // 添加遭遇方式翻译
@@ -189,12 +191,12 @@ async function initializePokemonList() {
     if (isInitialized) return;
     
     try {
-        // 获取前 1000 个宝可梦（可以根据需要调整数量）
-        const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1000');
+        // 获取前 1000 个宝可梦的基本列表
+        const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1025');
         const data = await response.json();
         
-        // 获取每个宝可梦的详细信息和中文名称
-        const promises = data.results.map(async (pokemon) => {
+        // 获取每个宝可梦的中文名称
+        const speciesPromises = data.results.map(async (pokemon) => {
             const speciesResponse = await fetch(pokemon.url.replace('/pokemon/', '/pokemon-species/'));
             const speciesData = await speciesResponse.json();
             
@@ -202,25 +204,105 @@ async function initializePokemonList() {
                 name => name.language.name === 'zh-Hans'
             )?.name || pokemon.name;
             
-            pokemonNameCache.set(pokemon.name, chineseName);
             return {
+                id: parseInt(pokemon.url.split('/').slice(-2, -1)[0]),
                 name: pokemon.name,
-                chinese_name: chineseName,
-                url: pokemon.url
+                chinese_name: chineseName
             };
         });
         
-        pokemonList = await Promise.all(promises);
+        // 等待所有中文名称获取完成
+        pokemonList = await Promise.all(speciesPromises);
+        
+        // 按 ID 排序
+        pokemonList.sort((a, b) => a.id - b.id);
+        
+        // 初始化完成
         isInitialized = true;
         
         // 设置搜索建议功能
         setupSearchSuggestions();
+
+// 添加搜索建议功能
+function setupSearchSuggestions() {
+    const searchInput = document.getElementById('searchInput');
+    const suggestionsDiv = document.createElement('div');
+    suggestionsDiv.className = 'search-suggestions';
+    searchInput.parentNode.appendChild(suggestionsDiv);
+
+    searchInput.addEventListener('input', () => {
+        const value = searchInput.value.toLowerCase();
+        if (!value) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+
+        const matches = pokemonList.filter(pokemon =>
+            pokemon.chinese_name.toLowerCase().includes(value) ||
+            pokemon.name.toLowerCase().includes(value) ||
+            pokemon.id.toString().includes(value)
+        ).slice(0, 5);
+
+        if (matches.length > 0) {
+            suggestionsDiv.innerHTML = matches.map(pokemon =>
+                `<div class="suggestion-item" onclick="searchPokemon('${pokemon.name}')">
+                    #${pokemon.id.toString().padStart(3, '0')} ${pokemon.chinese_name} (${pokemon.name})
+                </div>`
+            ).join('');
+            suggestionsDiv.style.display = 'block';
+        } else {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+
+    // 点击其他地方时隐藏建议
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+}
     } catch (error) {
         console.error('初始化宝可梦列表失败:', error);
     }
 }
 
 // 修改搜索函数
+// 添加请求缓存
+const requestCache = new Map();
+
+// 添加延迟函数
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 带重试的fetch函数
+async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
+    // 检查缓存
+    if (requestCache.has(url)) {
+        return requestCache.get(url);
+    }
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            // 存入缓存
+            requestCache.set(url, data);
+            return data;
+        } catch (error) {
+            if (i === retries - 1) throw error;
+            await delay(delayMs * (i + 1)); // 递增延迟时间
+        }
+    }
+}
+
+let currentMoves = [];
+let moveCache = new Map();
+
 async function searchPokemon(nameOrId = '') {
     const searchInput = (nameOrId || document.getElementById('searchInput').value).toLowerCase();
     const resultDiv = document.getElementById('result');
@@ -257,16 +339,14 @@ async function searchPokemon(nameOrId = '') {
             searchTerm = foundPokemon.name;
         }
 
+        // 显示加载提示
+        resultDiv.innerHTML = '<p>正在加载宝可梦详细信息，请稍候...</p>';
+
         // 继续原有的获取宝可梦详细信息的逻辑
-        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${searchTerm}/`);
-        if (!response.ok) {
-            throw new Error('未找到宝可梦');
-        }
-        const data = await response.json();
+        const data = await fetchWithRetry(`https://pokeapi.co/api/v2/pokemon/${searchTerm}/`);
 
         // 获取宝可梦的详细种族信息
-        const speciesResponse = await fetch(data.species.url);
-        const speciesData = await speciesResponse.json();
+        const speciesData = await fetchWithRetry(data.species.url);
 
         // 获取中文名称
         const chineseName = speciesData.names.find(
@@ -288,8 +368,7 @@ async function searchPokemon(nameOrId = '') {
         // 获取技能详细信息
         const abilities = await Promise.all(
             data.abilities.map(async (ability) => {
-                const abilityResponse = await fetch(ability.ability.url);
-                const abilityData = await abilityResponse.json();
+                const abilityData = await fetchWithRetry(ability.ability.url);
                 
                 // 获取中文特性名称
                 const chineseName = abilityData.names.find(
@@ -313,68 +392,15 @@ async function searchPokemon(nameOrId = '') {
             })
         );
 
-        // 获取技能中文名称
-        allMoves = await Promise.all(
-            data.moves.map(async (move) => {
-                const moveResponse = await fetch(move.move.url);
-                const moveData = await moveResponse.json();
-                
-                // 获取中文名称
-                const chineseName = moveData.names.find(
-                    name => name.language.name === 'zh-Hans'
-                )?.name || move.move.name;
-
-                // 获取中文描述
-                const chineseDescription = moveData.flavor_text_entries.find(
-                    entry => entry.language.name === 'zh-Hans'
-                ) || moveData.flavor_text_entries.find(
-                    entry => entry.language.name === 'zh-Hant'
-                ) || moveData.flavor_text_entries.find(
-                    entry => entry.language.name === 'en'
-                );
-
-                // 获取学习方式
-                const learnMethods = move.version_group_details.map(detail => {
-                    const method = detail.move_learn_method.name;
-                    const level = detail.level_learned_at;
-                    
-                    switch(method) {
-                        case 'level-up':
-                            return `升级至${level}级`;
-                        case 'machine':
-                            return 'TM/TR（技能机学习）';
-                        case 'egg':
-                            return '蛋技能';
-                        case 'tutor':
-                            return '技能教学';
-                        default:
-                            return method;
-                    }
-                });
-
-                return {
-                    name: chineseName,
-                    description: chineseDescription ? chineseDescription.flavor_text.replace(/\f/g, ' ') : '无描述',
-                    power: moveData.power || '-',
-                    accuracy: moveData.accuracy ? `${moveData.accuracy}%` : '-',
-                    pp: moveData.pp,
-                    type: typeTranslations[moveData.type.name] || moveData.type.name,
-                    learnMethods: [...new Set(learnMethods)].join(', ')
-                };
-            })
-        );
-
         // 获取进化链数据
         const evolutionChainUrl = speciesData.evolution_chain.url;
-        const evolutionResponse = await fetch(evolutionChainUrl);
-        const evolutionData = await evolutionResponse.json();
+        const evolutionData = await fetchWithRetry(evolutionChainUrl);
 
         // 处理进化链数据
         const evolutionChain = await processEvolutionChain(evolutionData.chain);
 
         // 获取遭遇地点数据
-        const encountersResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${data.id}/encounters`);
-        const encountersData = await encountersResponse.json();
+        const encountersData = await fetchWithRetry(`https://pokeapi.co/api/v2/pokemon/${data.id}/encounters`);
 
         // 处理遭遇地点数据
         const encounters = await processEncounters(encountersData);
@@ -392,14 +418,115 @@ async function searchPokemon(nameOrId = '') {
             encounters: encounters
         };
 
-        // 重置当前页码
+        // 重置当前页码和技能数据
         currentPage = 1;
+        currentMoves = [];
+        
+        // 只加载前10个技能的详细信息
+        const firstPageMoves = data.moves.slice(0, 10);
+        currentMoves = await loadMovesDetails(firstPageMoves);
         
         // 渲染宝可梦卡片
         renderPokemonCard(currentPokemonData.data, currentPokemonData.speciesData, 
                          currentPokemonData.abilities, currentPokemonData.description);
     } catch (error) {
         resultDiv.innerHTML = `<p class="error">${error.message}</p>`;
+    }
+}
+
+async function loadMovesDetails(moves) {
+    return await Promise.all(
+        moves.map(async (move) => {
+            // 检查缓存中是否已有该技能数据
+            if (moveCache.has(move.move.url)) {
+                return moveCache.get(move.move.url);
+            }
+
+            const moveData = await fetchWithRetry(move.move.url);
+            
+            // 获取中文名称
+            const chineseName = moveData.names.find(
+                name => name.language.name === 'zh-Hans'
+            )?.name || move.move.name;
+
+            // 获取中文描述
+            const chineseDescription = moveData.flavor_text_entries.find(
+                entry => entry.language.name === 'zh-Hans'
+            ) || moveData.flavor_text_entries.find(
+                entry => entry.language.name === 'zh-Hant'
+            ) || moveData.flavor_text_entries.find(
+                entry => entry.language.name === 'en'
+            );
+
+            // 获取学习方式
+            const learnMethods = move.version_group_details.map(detail => {
+                const method = detail.move_learn_method.name;
+                const level = detail.level_learned_at;
+                
+                switch(method) {
+                    case 'level-up':
+                        return `升级至${level}级`;
+                    case 'machine':
+                        return 'TM/TR（技能机学习）';
+                    case 'egg':
+                        return '蛋技能';
+                    case 'tutor':
+                        return '技能教学';
+                    default:
+                        return method;
+                }
+            });
+
+            const moveInfo = {
+                name: chineseName,
+                description: chineseDescription ? chineseDescription.flavor_text.replace(/\f/g, ' ') : '无描述',
+                power: moveData.power || '-',
+                accuracy: moveData.accuracy ? `${moveData.accuracy}%` : '-',
+                pp: moveData.pp,
+                type: typeTranslations[moveData.type.name] || moveData.type.name,
+                learnMethods: [...new Set(learnMethods)].join(', ')
+            };
+
+            // 将技能数据添加到缓存
+            moveCache.set(move.move.url, moveInfo);
+
+            return moveInfo;
+        })
+    );
+}
+
+async function changePage(page) {
+    const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
+    if (page < 1 || page > totalPages) return;
+
+    // 显示加载提示
+    const movesTableBody = document.querySelector('.moves-table tbody');
+    if (movesTableBody) {
+        movesTableBody.innerHTML = '<tr><td colspan="7">加载中...</td></tr>';
+    }
+
+    try {
+        // 如果是首次点击下一页或末页，加载所有技能数据
+        if (page > 1 && currentMoves.length <= 10) {
+            const allMoves = currentPokemonData.data.moves;
+            currentMoves = await loadMovesDetails(allMoves);
+        }
+
+        currentPage = page;
+        const startIndex = (currentPage - 1) * 10;
+        const endIndex = startIndex + 10;
+        
+        // 从已加载的技能数据中获取当前页的数据
+        const displayMoves = currentMoves.slice(startIndex, endIndex);
+        
+        // 重新渲染宝可梦卡片
+        renderPokemonCard(currentPokemonData.data, currentPokemonData.speciesData, 
+                         currentPokemonData.abilities, currentPokemonData.description);
+    } catch (error) {
+        console.error('加载技能数据失败:', error);
+        if (movesTableBody) {
+            movesTableBody.innerHTML = '<tr><td colspan="7">加载技能数据失败，请重试</td></tr>';
+        }
     }
 }
 
@@ -461,10 +588,7 @@ function renderStats(stats, totalStats) {
 
 // 修改渲染宝可梦卡片的函数
 function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
-    const startIndex = (currentPage - 1) * 10;
-    const endIndex = startIndex + 10;
-    const currentMoves = allMoves.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(allMoves.length / 10);
+    const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
 
     const evolutionChainHTML = `
         <div class="evolution-chain">
@@ -615,7 +739,7 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${currentMoves.map(move => `
+                                ${currentMoves.length > 0 ? currentMoves.map(move => `
                                     <tr>
                                         <td>${move.name}</td>
                                         <td>${move.type}</td>
@@ -625,7 +749,7 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
                                         <td>${move.description}</td>
                                         <td>${move.learnMethods}</td>
                                     </tr>
-                                `).join('')}
+                                `).join('') : '<tr><td colspan="7">加载中...</td></tr>'}
                             </tbody>
                         </table>
                         <div class="pagination">
@@ -636,7 +760,7 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
                                 上一页
                             </button>
                             <span class="pagination-info">
-                                第 ${currentPage}/${totalPages} 页 (共 ${allMoves.length} 个技能)
+                                第 ${currentPage}/${totalPages} 页 (共 ${currentPokemonData.data.moves.length} 个技能)
                             </span>
                             <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
                                 下一页
@@ -655,10 +779,20 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
 }
 
 // 修改切换页面的函数
-function changePage(newPage) {
-    if (!currentPokemonData || newPage < 1 || newPage > Math.ceil(allMoves.length / 10)) return;
+async function changePage(newPage) {
+    if (!currentPokemonData || newPage < 1 || newPage > Math.ceil(currentPokemonData.data.moves.length / 10)) return;
     
     currentPage = newPage;
+    
+    // 计算当前页面应该显示的技能范围
+    const startIndex = (currentPage - 1) * 10;
+    const endIndex = startIndex + 10;
+    const pageMoves = currentPokemonData.data.moves.slice(startIndex, endIndex);
+    
+    // 加载当前页面的技能详细信息
+    currentMoves = await loadMovesDetails(pageMoves);
+    
+    // 重新渲染宝可梦卡片
     renderPokemonCard(
         currentPokemonData.data,
         currentPokemonData.speciesData,
@@ -950,4 +1084,4 @@ async function getStatRanges(pokemonId) {
         console.error('获取种族值范围失败:', error);
         return null;
     }
-} 
+}
