@@ -186,6 +186,10 @@ const STAT_CALC = {
     }
 };
 
+// 全局变量，跟踪技能加载状态
+let isLoadingAllMoves = false;
+let allMovesLoaded = false;
+
 // 修改初始化函数
 async function initializePokemonList() {
     if (isInitialized) return;
@@ -373,6 +377,7 @@ async function searchPokemon(nameOrId = '') {
         // 重置当前页码和技能数据
         currentPage = 1;
         currentMoves = [];
+        allMovesLoaded = false;  // 重置技能加载状态
         
         // 只加载前10个技能的详细信息
         const firstPageMoves = data.moves.slice(0, 10);
@@ -452,39 +457,103 @@ async function loadMovesDetails(moves) {
     );
 }
 
+// 完全重写changePage函数
 async function changePage(page) {
+    console.log("changePage called with page:", page);
+    
+    // 防止重复点击
+    if (isLoadingAllMoves) {
+        console.log("Already loading moves, returning");
+        return;
+    }
+    
+    if (!currentPokemonData) {
+        console.log("No Pokemon data available");
+        return;
+    }
+    
     const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
-    if (page < 1 || page > totalPages) return;
+    if (page < 1 || page > totalPages) {
+        console.log("Invalid page number:", page);
+        return;
+    }
 
     // 显示加载提示
     const movesTableBody = document.querySelector('.moves-table tbody');
-    if (movesTableBody) {
-        movesTableBody.innerHTML = '<tr><td colspan="7">加载中...</td></tr>';
+    if (!movesTableBody) {
+        console.log("Moves table body not found");
+        return;
     }
-
+    
+    movesTableBody.innerHTML = '<tr><td colspan="7">加载中...</td></tr>';
+    
     try {
-        // 如果是首次点击下一页或末页，加载所有技能数据
-        if (page > 1 && currentMoves.length <= 10) {
+        isLoadingAllMoves = true;
+        console.log("isLoadingAllMoves set to true");
+        
+        // 如果还没有加载所有技能，并且不是第一页，则加载所有技能
+        if (!allMovesLoaded && (page > 1 || currentMoves.length < 10)) {
+            console.log("Loading all moves...");
+            
+            // 加载所有技能数据
             const allMoves = currentPokemonData.data.moves;
             currentMoves = await loadMovesDetails(allMoves);
+            allMovesLoaded = true;
+            
+            console.log("All moves loaded, count:", currentMoves.length);
         }
-
+        
         currentPage = page;
         const startIndex = (currentPage - 1) * 10;
-        const endIndex = startIndex + 10;
+        const endIndex = Math.min(startIndex + 10, currentMoves.length);
+        
+        console.log("Displaying moves from", startIndex, "to", endIndex);
         
         // 从已加载的技能数据中获取当前页的数据
         const displayMoves = currentMoves.slice(startIndex, endIndex);
         
-        // 重新渲染宝可梦卡片
-        renderPokemonCard(currentPokemonData.data, currentPokemonData.speciesData, 
-                         currentPokemonData.abilities, currentPokemonData.description);
+        // 更新技能表格
+        movesTableBody.innerHTML = displayMoves.map(move => `
+            <tr>
+                <td>${move.name}</td>
+                <td>${move.type}</td>
+                <td>${move.power}</td>
+                <td>${move.accuracy}</td>
+                <td>${move.pp}</td>
+                <td>${move.description}</td>
+                <td>${move.learnMethods}</td>
+            </tr>
+        `).join('');
+        
+        // 更新分页信息
+        updatePaginationControls(currentPage, totalPages);
+        
     } catch (error) {
         console.error('加载技能数据失败:', error);
-        if (movesTableBody) {
-            movesTableBody.innerHTML = '<tr><td colspan="7">加载技能数据失败，请重试</td></tr>';
-        }
+        movesTableBody.innerHTML = `<tr><td colspan="7">加载技能数据失败: ${error.message}</td></tr>`;
+    } finally {
+        isLoadingAllMoves = false;
+        console.log("isLoadingAllMoves reset to false");
     }
+}
+
+// 添加一个新函数来更新分页控件
+function updatePaginationControls(currentPage, totalPages) {
+    const paginationInfo = document.querySelector('.pagination-info');
+    if (paginationInfo) {
+        paginationInfo.textContent = `第 ${currentPage}/${totalPages} 页 (共 ${currentPokemonData.data.moves.length} 个技能)`;
+    }
+    
+    const prevButtons = document.querySelectorAll('.pagination button:nth-child(1), .pagination button:nth-child(2)');
+    const nextButtons = document.querySelectorAll('.pagination button:nth-child(4), .pagination button:nth-child(5)');
+    
+    prevButtons.forEach(button => {
+        button.disabled = currentPage === 1;
+    });
+    
+    nextButtons.forEach(button => {
+        button.disabled = currentPage === totalPages;
+    });
 }
 
 // 修改渲染能力值的部分
@@ -599,6 +668,9 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
     // 使用新的渲染函数
     const statsHTML = renderStats(data.stats, totalStats);
 
+    // 使用新的renderMovesTable函数
+    const movesTableHTML = renderMovesTable(currentMoves, currentPage, totalPages);
+
     const pokemonCard = `
         <div class="pokemon-card">
             ${evolutionChainHTML}
@@ -680,72 +752,36 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
                     ${speciesAndEncountersHTML}
                 </div>
                 
-                <div class="moves module-section">
-                    <h3>可学会的技能:</h3>
-                    <div class="moves-list">
-                        <table class="moves-table">
-                            <thead>
-                                <tr>
-                                    <th>技能名称</th>
-                                    <th>属性</th>
-                                    <th>威力</th>
-                                    <th>命中</th>
-                                    <th>PP值</th>
-                                    <th>效果</th>
-                                    <th>获得方式</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${currentMoves.length > 0 ? currentMoves.map(move => `
-                                    <tr>
-                                        <td>${move.name}</td>
-                                        <td>${move.type}</td>
-                                        <td>${move.power}</td>
-                                        <td>${move.accuracy}</td>
-                                        <td>${move.pp}</td>
-                                        <td>${move.description}</td>
-                                        <td>${move.learnMethods}</td>
-                                    </tr>
-                                `).join('') : '<tr><td colspan="7">加载中...</td></tr>'}
-                            </tbody>
-                        </table>
-                        <div class="pagination">
-                            <button onclick="changePage(1)" ${currentPage === 1 ? 'disabled' : ''}>
-                                首页
-                            </button>
-                            <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
-                                上一页
-                            </button>
-                            <span class="pagination-info">
-                                第 ${currentPage}/${totalPages} 页 (共 ${currentPokemonData.data.moves.length} 个技能)
-                            </span>
-                            <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
-                                下一页
-                            </button>
-                            <button onclick="changePage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>
-                                末页
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                ${movesTableHTML}
             </div>
         </div>
     `;
 
     document.getElementById('result').innerHTML = pokemonCard;
-}
-
-// 修改切换页面的函数
-function changePage(newPage) {
-    if (!currentPokemonData || newPage < 1 || newPage > Math.ceil(allMoves.length / 10)) return;
     
-    currentPage = newPage;
-    renderPokemonCard(
-        currentPokemonData.data,
-        currentPokemonData.speciesData,
-        currentPokemonData.abilities,
-        currentPokemonData.description
-    );
+    // 在DOM更新后绑定分页按钮事件
+    setTimeout(() => {
+        const paginationButtons = document.querySelectorAll('.pagination button');
+        paginationButtons.forEach(button => {
+            // 移除所有现有事件监听器
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            
+            // 根据按钮类名设置新的点击事件
+            if (newButton.classList.contains('page-first')) {
+                newButton.addEventListener('click', () => changePage(1));
+            } else if (newButton.classList.contains('page-prev')) {
+                newButton.addEventListener('click', () => changePage(currentPage - 1));
+            } else if (newButton.classList.contains('page-next')) {
+                newButton.addEventListener('click', () => changePage(currentPage + 1));
+            } else if (newButton.classList.contains('page-last')) {
+                const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
+                newButton.addEventListener('click', () => changePage(totalPages));
+            }
+        });
+        
+        console.log('分页按钮事件已绑定');
+    }, 100);
 }
 
 // 修改能力值名称翻译函数
@@ -1034,4 +1070,50 @@ async function getStatRanges(pokemonId) {
         console.error('获取种族值范围失败:', error);
         return null;
     }
+}
+
+// 修改renderMovesTable函数，使用新的renderMovesTable函数
+function renderMovesTable(moves, currentPage, totalPages) {
+    return `
+        <div class="moves module-section">
+            <h3>可学会的技能:</h3>
+            <div class="moves-list">
+                <table class="moves-table">
+                    <thead>
+                        <tr>
+                            <th>技能名称</th>
+                            <th>属性</th>
+                            <th>威力</th>
+                            <th>命中</th>
+                            <th>PP值</th>
+                            <th>效果</th>
+                            <th>获得方式</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${moves.length > 0 ? moves.map(move => `
+                            <tr>
+                                <td>${move.name}</td>
+                                <td>${move.type}</td>
+                                <td>${move.power}</td>
+                                <td>${move.accuracy}</td>
+                                <td>${move.pp}</td>
+                                <td>${move.description}</td>
+                                <td>${move.learnMethods}</td>
+                            </tr>
+                        `).join('') : '<tr><td colspan="7">加载中...</td></tr>'}
+                    </tbody>
+                </table>
+                <div class="pagination">
+                    <button class="page-first">首页</button>
+                    <button class="page-prev">上一页</button>
+                    <span class="pagination-info">
+                        第 ${currentPage}/${totalPages} 页 (共 ${currentPokemonData.data.moves.length} 个技能)
+                    </span>
+                    <button class="page-next">下一页</button>
+                    <button class="page-last">末页</button>
+                </div>
+            </div>
+        </div>
+    `;
 }
