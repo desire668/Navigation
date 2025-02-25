@@ -186,7 +186,7 @@ const STAT_CALC = {
     }
 };
 
-// 添加初始化函数
+// 修改初始化函数
 async function initializePokemonList() {
     if (isInitialized) return;
     
@@ -222,46 +222,6 @@ async function initializePokemonList() {
         
         // 设置搜索建议功能
         setupSearchSuggestions();
-
-// 添加搜索建议功能
-function setupSearchSuggestions() {
-    const searchInput = document.getElementById('searchInput');
-    const suggestionsDiv = document.createElement('div');
-    suggestionsDiv.className = 'search-suggestions';
-    searchInput.parentNode.appendChild(suggestionsDiv);
-
-    searchInput.addEventListener('input', () => {
-        const value = searchInput.value.toLowerCase();
-        if (!value) {
-            suggestionsDiv.style.display = 'none';
-            return;
-        }
-
-        const matches = pokemonList.filter(pokemon =>
-            pokemon.chinese_name.toLowerCase().includes(value) ||
-            pokemon.name.toLowerCase().includes(value) ||
-            pokemon.id.toString().includes(value)
-        ).slice(0, 5);
-
-        if (matches.length > 0) {
-            suggestionsDiv.innerHTML = matches.map(pokemon =>
-                `<div class="suggestion-item" onclick="searchPokemon('${pokemon.name}')">
-                    #${pokemon.id.toString().padStart(3, '0')} ${pokemon.chinese_name} (${pokemon.name})
-                </div>`
-            ).join('');
-            suggestionsDiv.style.display = 'block';
-        } else {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-
-    // 点击其他地方时隐藏建议
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-}
     } catch (error) {
         console.error('初始化宝可梦列表失败:', error);
     }
@@ -313,34 +273,26 @@ async function searchPokemon(nameOrId = '') {
     }
 
     try {
-        // 确保宝可梦列表已初始化
-        if (!isInitialized) {
-            resultDiv.innerHTML = '<p>正在加载宝可梦数据，请稍候...</p>';
-            await initializePokemonList();
-        }
-
-        // 搜索逻辑
+        // 显示加载提示
+        resultDiv.innerHTML = '<p>正在加载宝可梦详细信息，请稍候...</p>';
+        
+        // 直接尝试搜索，不等待完整列表初始化
         let searchTerm = searchInput;
         
         // 如果是数字ID，直接使用
         if (!isNaN(searchInput)) {
             searchTerm = searchInput;
-        } else {
-            // 查找匹配的宝可梦
+        } else if (isInitialized) {
+            // 如果列表已初始化，尝试查找匹配的宝可梦
             const foundPokemon = pokemonList.find(pokemon => 
                 pokemon.chinese_name.toLowerCase() === searchInput ||
                 pokemon.name.toLowerCase() === searchInput
             );
 
-            if (!foundPokemon) {
-                throw new Error('未找到宝可梦');
+            if (foundPokemon) {
+                searchTerm = foundPokemon.name;
             }
-            
-            searchTerm = foundPokemon.name;
         }
-
-        // 显示加载提示
-        resultDiv.innerHTML = '<p>正在加载宝可梦详细信息，请稍候...</p>';
 
         // 继续原有的获取宝可梦详细信息的逻辑
         const data = await fetchWithRetry(`https://pokeapi.co/api/v2/pokemon/${searchTerm}/`);
@@ -429,6 +381,11 @@ async function searchPokemon(nameOrId = '') {
         // 渲染宝可梦卡片
         renderPokemonCard(currentPokemonData.data, currentPokemonData.speciesData, 
                          currentPokemonData.abilities, currentPokemonData.description);
+                         
+        // 如果列表尚未初始化，在后台开始初始化
+        if (!isInitialized) {
+            initializePokemonList();
+        }
     } catch (error) {
         resultDiv.innerHTML = `<p class="error">${error.message}</p>`;
     }
@@ -779,20 +736,10 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
 }
 
 // 修改切换页面的函数
-async function changePage(newPage) {
-    if (!currentPokemonData || newPage < 1 || newPage > Math.ceil(currentPokemonData.data.moves.length / 10)) return;
+function changePage(newPage) {
+    if (!currentPokemonData || newPage < 1 || newPage > Math.ceil(allMoves.length / 10)) return;
     
     currentPage = newPage;
-    
-    // 计算当前页面应该显示的技能范围
-    const startIndex = (currentPage - 1) * 10;
-    const endIndex = startIndex + 10;
-    const pageMoves = currentPokemonData.data.moves.slice(startIndex, endIndex);
-    
-    // 加载当前页面的技能详细信息
-    currentMoves = await loadMovesDetails(pageMoves);
-    
-    // 重新渲染宝可梦卡片
     renderPokemonCard(
         currentPokemonData.data,
         currentPokemonData.speciesData,
@@ -1010,8 +957,11 @@ function selectPokemon(name) {
     searchPokemon(name);
 }
 
-// 在页面加载时初始化宝可梦列表
-window.addEventListener('load', initializePokemonList);
+// 在页面加载时开始初始化宝可梦列表，但不阻塞用户操作
+window.addEventListener('load', () => {
+    // 延迟一秒开始加载，让页面先完成渲染
+    setTimeout(initializePokemonList, 1000);
+});
 
 // 添加处理遭遇地点的函数
 async function processEncounters(encountersData) {
