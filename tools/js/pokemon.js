@@ -1,3 +1,6 @@
+// 在文件开头添加
+console.log('Pokemon.js loaded successfully');
+
 // 添加属性翻译对象
 const typeTranslations = {
     'normal': '一般',
@@ -65,7 +68,28 @@ const itemTranslations = {
     'dawn-stone': '觉醒之石',
     'leaf-stone': '叶之石',
     'ice-stone': '冰之石',
-    'oval-stone': '椭圆之石'
+    'oval-stone': '椭圆之石',
+    'master-ball': '大师球',
+    'ultra-ball': '高级球',
+    'great-ball': '超级球',
+    'poke-ball': '精灵球',
+    'potion': '伤药',
+    'super-potion': '好伤药',
+    'hyper-potion': '厉害伤药',
+    'max-potion': '全满药',
+    'revive': '活力碎片',
+    'max-revive': '活力块',
+    'full-restore': '全复药',
+    'antidote': '解毒药',
+    'burn-heal': '烧伤药',
+    'ice-heal': '解冻药',
+    'awakening': '解眠药',
+    'paralyze-heal': '解麻药',
+    'full-heal': '万能药',
+    'escape-rope': '离洞绳',
+    'repel': '除虫喷雾',
+    'super-repel': '白银喷雾',
+    'max-repel': '黄金喷雾'
 };
 
 // 修改地点翻译对象
@@ -189,6 +213,77 @@ const STAT_CALC = {
 // 全局变量，跟踪技能加载状态
 let isLoadingAllMoves = false;
 let allMovesLoaded = false;
+
+// 添加浆果名称翻译对象
+const berryTranslations = {
+    'cheri': '樱子果',
+    'chesto': '零余果',
+    'pecha': '桃桃果',
+    'rawst': '莓莓果',
+    'aspear': '利木果',
+    'leppa': '苹野果',
+    'oran': '橙橙果',
+    'persim': '柿仔果',
+    'lum': '木子果',
+    'sitrus': '文柚果',
+    'figy': '异奇果',
+    'wiki': '芭亚果',
+    'mago': '芒芒果',
+    'aguav': '乐芭果',
+    'iapapa': '芭乐果',
+    'razz': '蔓莓果',
+    'bluk': '墨莓果',
+    'nanab': '蕉香果',
+    'wepear': '西梨果',
+    'pinap': '凰梨果',
+    'pomeg': '榴石果',
+    'kelpsy': '藻根果',
+    'qualot': '比巴果',
+    'hondew': '哈密果',
+    'grepa': '萄葡果',
+    'tamato': '茄番果',
+    'cornn': '玉黍果',
+    'magost': '岳竹果',
+    'rabuta': '茸丹果',
+    'nomel': '檬柠果',
+    'spelon': '刺角果',
+    'pamtre': '椰木果',
+    'watmel': '瓜西果',
+    'durin': '金枕果',
+    'belue': '靛莓果',
+    'occa': '欧可果',
+    'passho': '帕塞果',
+    'wacan': '瓦仓果',
+    'rindo': '林档果',
+    'yache': '雅档果',
+    'chople': '释陀果',
+    'kebia': '嘉宝果',
+    'shuca': '沙鳞果',
+    'coba': '龙睛果',
+    'payapa': '啪亚果',
+    'tanga': '茶蕾果',
+    'charti': '隐逸果',
+    'kasib': '香罗果',
+    'haban': '莲蒲果',
+    'colbur': '通通果',
+    'babiri': '巴列果',
+    'chilan': '哈密果',
+    'liechi': '荔枝果',
+    'ganlon': '龙眼果',
+    'salac': '沙蔓果',
+    'petaya': '龙火果',
+    'apicot': '杏仔果',
+    'lansat': '兰萨果',
+    'starf': '星桃果',
+    'enigma': '谜芝果',
+    'micle': '奇秘果',
+    'custap': '释陀果',
+    'jaboca': '嘉宝果',
+    'rowap': '莲蒲果',
+    'roseli': '玫茄果',
+    'kee': '凯利果',
+    'maranga': '莲蒲果'
+};
 
 // 修改初始化函数
 async function initializePokemonList() {
@@ -1072,7 +1167,7 @@ async function getStatRanges(pokemonId) {
     }
 }
 
-// 修改renderMovesTable函数，使用新的renderMovesTable函数
+// 修改renderMovesTable函数，使用内联onclick属性
 function renderMovesTable(moves, currentPage, totalPages) {
     return `
         <div class="moves module-section">
@@ -1105,15 +1200,264 @@ function renderMovesTable(moves, currentPage, totalPages) {
                     </tbody>
                 </table>
                 <div class="pagination">
-                    <button class="page-first">首页</button>
-                    <button class="page-prev">上一页</button>
+                    <button onclick="window.loadAllMovesAndChangePage(1)">首页</button>
+                    <button onclick="window.loadAllMovesAndChangePage(${currentPage - 1})">上一页</button>
                     <span class="pagination-info">
                         第 ${currentPage}/${totalPages} 页 (共 ${currentPokemonData.data.moves.length} 个技能)
                     </span>
-                    <button class="page-next">下一页</button>
-                    <button class="page-last">末页</button>
+                    <button onclick="window.loadAllMovesAndChangePage(${currentPage + 1})">下一页</button>
+                    <button onclick="window.loadAllMovesAndChangePage(${totalPages})">末页</button>
                 </div>
             </div>
         </div>
     `;
+}
+
+// 添加一个全局函数，确保可以从HTML中调用
+window.loadAllMovesAndChangePage = async function(page) {
+    console.log("loadAllMovesAndChangePage called with page:", page);
+    
+    if (!currentPokemonData) {
+        console.log("No Pokemon data available");
+        return;
+    }
+    
+    const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
+    if (page < 1 || page > totalPages) {
+        console.log("Invalid page number:", page);
+        return;
+    }
+    
+    // 显示加载提示
+    const movesTableBody = document.querySelector('.moves-table tbody');
+    if (!movesTableBody) {
+        console.log("Moves table body not found");
+        return;
+    }
+    
+    movesTableBody.innerHTML = '<tr><td colspan="7">加载中...</td></tr>';
+    
+    try {
+        console.log("Loading all moves...");
+        
+        // 加载所有技能数据
+        if (currentMoves.length < currentPokemonData.data.moves.length) {
+            const allMoves = currentPokemonData.data.moves;
+            currentMoves = await loadMovesDetails(allMoves);
+            console.log("All moves loaded, count:", currentMoves.length);
+        }
+        
+        currentPage = page;
+        const startIndex = (currentPage - 1) * 10;
+        const endIndex = Math.min(startIndex + 10, currentMoves.length);
+        
+        console.log("Displaying moves from", startIndex, "to", endIndex);
+        
+        // 从已加载的技能数据中获取当前页的数据
+        const displayMoves = currentMoves.slice(startIndex, endIndex);
+        
+        // 更新技能表格
+        movesTableBody.innerHTML = displayMoves.map(move => `
+            <tr>
+                <td>${move.name}</td>
+                <td>${move.type}</td>
+                <td>${move.power}</td>
+                <td>${move.accuracy}</td>
+                <td>${move.pp}</td>
+                <td>${move.description}</td>
+                <td>${move.learnMethods}</td>
+            </tr>
+        `).join('');
+        
+        // 更新分页信息和按钮
+        const paginationInfo = document.querySelector('.pagination-info');
+        if (paginationInfo) {
+            paginationInfo.textContent = `第 ${currentPage}/${totalPages} 页 (共 ${currentPokemonData.data.moves.length} 个技能)`;
+        }
+        
+        const prevButtons = document.querySelectorAll('.pagination button:nth-child(1), .pagination button:nth-child(2)');
+        const nextButtons = document.querySelectorAll('.pagination button:nth-child(4), .pagination button:nth-child(5)');
+        
+        prevButtons.forEach(button => {
+            button.disabled = currentPage === 1;
+        });
+        
+        nextButtons.forEach(button => {
+            button.disabled = currentPage === totalPages;
+        });
+        
+    } catch (error) {
+        console.error('加载技能数据失败:', error);
+        movesTableBody.innerHTML = `<tr><td colspan="7">加载技能数据失败: ${error.message}</td></tr>`;
+    }
+};
+
+// 修改 document.addEventListener('DOMContentLoaded') 的部分
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded');
+    
+    // 确保移除旧的事件监听器
+    const menuItems = document.querySelectorAll('.menu-item');
+    menuItems.forEach(item => {
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
+    });
+
+    // 重新添加事件监听器
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault(); // 阻止默认行为
+            
+            // 移除所有active类
+            document.querySelectorAll('.menu-item').forEach(i => {
+                i.classList.remove('active');
+            });
+            
+            // 添加active类到当前点击项
+            this.classList.add('active');
+            
+            // 获取并切换视图
+            const viewType = this.getAttribute('data-view');
+            console.log('Switching to view:', viewType); // 添加调试日志
+            switchView(viewType);
+        });
+    });
+
+    // 默认显示宝可梦搜索视图
+    switchView('pokemon');
+});
+
+// 修改 switchView 函数
+function switchView(viewType) {
+    const contentContainer = document.querySelector('.content-container');
+    
+    // 更新菜单项的激活状态
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-view') === viewType) {
+            item.classList.add('active');
+        }
+    });
+    
+    switch(viewType) {
+        case 'pokemon':
+            contentContainer.innerHTML = `
+                <h1>宝可梦图鉴</h1>
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="输入宝可梦ID或名称">
+                    <button id="searchButton" onclick="searchPokemon()">搜索</button>
+                    <div class="search-suggestions" id="searchSuggestions"></div>
+                </div>
+                <div id="result"></div>
+            `;
+            setupSearchSuggestions();
+            break;
+            
+        case 'berry':
+            contentContainer.innerHTML = `
+                <h1>浆果图鉴</h1>
+                <div class="berry-grid" id="berryGrid"></div>
+            `;
+            loadBerryList();
+            break;
+    }
+}
+
+// 修改浆果加载函数
+async function loadBerryList() {
+    const berryGrid = document.getElementById('berryGrid');
+    berryGrid.innerHTML = '<p>正在加载浆果数据...</p>';
+
+    try {
+        const response = await fetch('https://pokeapi.co/api/v2/berry?limit=64');
+        const data = await response.json();
+
+        const berryDetails = await Promise.all(
+            data.results.map(async (berry) => {
+                const berryResponse = await fetch(berry.url);
+                return berryResponse.json();
+            })
+        );
+
+        berryGrid.innerHTML = berryDetails.map(berry => `
+            <div class="berry-card" onclick="showBerryDetail(${berry.id})">
+                <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berries/${berry.name}-berry.png" 
+                     alt="${berry.name}" 
+                     onerror="this.src='path/to/fallback-image.png'">
+                <p>${berryTranslations[berry.name] || berry.name}</p>
+                <p class="berry-id">ID: ${berry.id}</p>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('加载浆果数据失败:', error);
+        berryGrid.innerHTML = '<p>加载浆果数据失败，请稍后重试</p>';
+    }
+}
+
+// 修改浆果详情显示函数
+async function showBerryDetail(berryId) {
+    const contentContainer = document.querySelector('.content-container');
+    contentContainer.innerHTML = '<p>正在加载浆果详情...</p>';
+
+    try {
+        const response = await fetch(`https://pokeapi.co/api/v2/berry/${berryId}/`);
+        const berry = await response.json();
+
+        const itemResponse = await fetch(`https://pokeapi.co/api/v2/item/${berry.item.name}/`);
+        const itemData = await itemResponse.json();
+
+        // 使用翻译对象获取中文名称
+        const chineseName = berryTranslations[berry.name] || berry.name;
+        const chineseDescription = itemData.flavor_text_entries.find(
+            entry => entry.language.name === 'zh-Hans'
+        )?.text || '暂无描述';
+
+        contentContainer.innerHTML = `
+            <div class="berry-detail-card">
+                <div class="berry-header">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berries/${berry.name}-berry.png" 
+                         alt="${berry.name}" 
+                         class="berry-image">
+                    <h2>${chineseName}</h2>
+                    <span class="berry-id">ID: ${berry.id}</span>
+                </div>
+                
+                <div class="berry-info-section">
+                    <div class="berry-basic-info">
+                        <h3>基本信息</h3>
+                        <table class="berry-info-table">
+                            <tr>
+                                <td>生长时间</td>
+                                <td>${berry.growth_time * 4}小时</td>
+                            </tr>
+                            <tr>
+                                <td>最大数量</td>
+                                <td>${berry.max_harvest}</td>
+                            </tr>
+                            <tr>
+                                <td>大小</td>
+                                <td>${berry.size}毫米</td>
+                            </tr>
+                            <tr>
+                                <td>硬度</td>
+                                <td>${berry.firmness.name}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="berry-description">
+                    <h3>描述</h3>
+                    <p>${chineseDescription}</p>
+                </div>
+
+                <button class="back-button" onclick="switchView('berry')">返回浆果列表</button>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error('加载浆果详情失败:', error);
+        contentContainer.innerHTML = '<p>加载浆果详情失败，请稍后重试</p>';
+    }
 }
