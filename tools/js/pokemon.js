@@ -214,147 +214,216 @@ const STAT_CALC = {
 let isLoadingAllMoves = false;
 let allMovesLoaded = false;
 
-// 添加浆果名称翻译对象
-const berryTranslations = {
-    'cheri': '樱子果',
-    'chesto': '零余果',
-    'pecha': '桃桃果',
-    'rawst': '莓莓果',
-    'aspear': '利木果',
-    'leppa': '苹野果',
-    'oran': '橙橙果',
-    'persim': '柿仔果',
-    'lum': '木子果',
-    'sitrus': '文柚果',
-    'figy': '异奇果',
-    'wiki': '芭亚果',
-    'mago': '芒芒果',
-    'aguav': '乐芭果',
-    'iapapa': '芭乐果',
-    'razz': '蔓莓果',
-    'bluk': '墨莓果',
-    'nanab': '蕉香果',
-    'wepear': '西梨果',
-    'pinap': '凰梨果',
-    'pomeg': '榴石果',
-    'kelpsy': '藻根果',
-    'qualot': '比巴果',
-    'hondew': '哈密果',
-    'grepa': '萄葡果',
-    'tamato': '茄番果',
-    'cornn': '玉黍果',
-    'magost': '岳竹果',
-    'rabuta': '茸丹果',
-    'nomel': '檬柠果',
-    'spelon': '刺角果',
-    'pamtre': '椰木果',
-    'watmel': '瓜西果',
-    'durin': '金枕果',
-    'belue': '靛莓果',
-    'occa': '欧可果',
-    'passho': '帕塞果',
-    'wacan': '瓦仓果',
-    'rindo': '林档果',
-    'yache': '雅档果',
-    'chople': '释陀果',
-    'kebia': '嘉宝果',
-    'shuca': '沙鳞果',
-    'coba': '龙睛果',
-    'payapa': '啪亚果',
-    'tanga': '茶蕾果',
-    'charti': '隐逸果',
-    'kasib': '香罗果',
-    'haban': '莲蒲果',
-    'colbur': '通通果',
-    'babiri': '巴列果',
-    'chilan': '哈密果',
-    'liechi': '荔枝果',
-    'ganlon': '龙眼果',
-    'salac': '沙蔓果',
-    'petaya': '龙火果',
-    'apicot': '杏仔果',
-    'lansat': '兰萨果',
-    'starf': '星桃果',
-    'enigma': '谜芝果',
-    'micle': '奇秘果',
-    'custap': '释陀果',
-    'jaboca': '嘉宝果',
-    'rowap': '莲蒲果',
-    'roseli': '玫茄果',
-    'kee': '凯利果',
-    'maranga': '莲蒲果'
+// 1. 添加缓存控制
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24小时
+const cache = {
+    pokemon: new Map(),
+    species: new Map(),
+    moves: new Map(),
+    evolution: new Map(),
+    
+    set: function(key, type, data) {
+        this[type].set(key, {
+            data: data,
+            timestamp: Date.now()
+        });
+    },
+    
+    get: function(key, type) {
+        const item = this[type].get(key);
+        if (!item) return null;
+        if (Date.now() - item.timestamp > CACHE_DURATION) {
+            this[type].delete(key);
+            return null;
+        }
+        return item.data;
+    }
 };
+
+// 在文件开头添加全局变量
+let debounceTimer;
 
 // 修改初始化函数
 async function initializePokemonList() {
     if (isInitialized) return;
     
     try {
-        // 获取前 1000 个宝可梦的基本列表
+        showLoadingState('正在加载宝可梦数据...');
+        
+        // 获取前 1025 个宝可梦的基本列表
         const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1025');
         const data = await response.json();
         
-        // 获取每个宝可梦的中文名称
-        const speciesPromises = data.results.map(async (pokemon) => {
-            const speciesResponse = await fetch(pokemon.url.replace('/pokemon/', '/pokemon-species/'));
-            const speciesData = await speciesResponse.json();
-            
-            const chineseName = speciesData.names.find(
-                name => name.language.name === 'zh-Hans'
-            )?.name || pokemon.name;
-            
-            return {
-                id: parseInt(pokemon.url.split('/').slice(-2, -1)[0]),
-                name: pokemon.name,
-                chinese_name: chineseName
-            };
-        });
+        // 批量获取宝可梦的中文名称
+        const batchSize = 50;
+        const batches = [];
         
-        // 等待所有中文名称获取完成
-        pokemonList = await Promise.all(speciesPromises);
+        for (let i = 0; i < data.results.length; i += batchSize) {
+            const batch = data.results.slice(i, i + batchSize);
+            batches.push(batch);
+        }
+        
+        let processedCount = 0;
+        const totalCount = data.results.length;
+        
+        for (const batch of batches) {
+            const batchPromises = batch.map(async (pokemon) => {
+                try {
+                    const speciesUrl = pokemon.url.replace('/pokemon/', '/pokemon-species/');
+                    const speciesResponse = await fetchWithRetry(speciesUrl);
+                    
+                    const chineseName = speciesResponse.names.find(
+                        name => name.language.name === 'zh-Hans'
+                    )?.name || pokemon.name;
+                    
+                    processedCount++;
+                    if (processedCount % 50 === 0) {
+                        showLoadingState(`正在加载宝可梦数据... (${processedCount}/${totalCount})`);
+                    }
+                    
+                    return {
+                        id: parseInt(pokemon.url.split('/').slice(-2, -1)[0]),
+                        name: pokemon.name,
+                        chinese_name: chineseName,
+                        url: pokemon.url
+                    };
+                } catch (error) {
+                    console.error(`获取宝可梦 ${pokemon.name} 的数据失败:`, error);
+                    return null;
+                }
+            });
+            
+            const batchResults = await Promise.all(batchPromises);
+            pokemonList.push(...batchResults.filter(result => result !== null));
+        }
         
         // 按 ID 排序
         pokemonList.sort((a, b) => a.id - b.id);
+        
+        // 将数据保存到本地存储
+        localStorage.setItem('pokemonList', JSON.stringify({
+            data: pokemonList,
+            timestamp: Date.now()
+        }));
         
         // 初始化完成
         isInitialized = true;
         
         // 设置搜索建议功能
         setupSearchSuggestions();
+        
+        // 清除加载提示
+        document.getElementById('result').innerHTML = '<p class="search-hint">请输入宝可梦名称或ID进行搜索</p>';
+        
     } catch (error) {
         console.error('初始化宝可梦列表失败:', error);
+        showError('加载宝可梦数据失败，请刷新页面重试');
     }
 }
 
-// 修改搜索函数
-// 添加请求缓存
-const requestCache = new Map();
+// 修改 displayPokemonList 函数，添加点击事件
+function displayPokemonList(pokemonList) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = `
+        <div class="pokemon-grid">
+            ${pokemonList.map(pokemon => `
+                <div class="pokemon-item" onclick="searchPokemon('${pokemon.name}')" role="button" tabindex="0">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png" 
+                         alt="${pokemon.chinese_name}"
+                         loading="lazy">
+                    <div class="pokemon-info">
+                        <span class="pokemon-id">#${String(pokemon.id).padStart(3, '0')}</span>
+                        <span class="pokemon-name">${pokemon.chinese_name}</span>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
 
-// 添加延迟函数
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    // 添加键盘访问支持
+    const pokemonItems = resultDiv.querySelectorAll('.pokemon-item');
+    pokemonItems.forEach(item => {
+        item.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                item.click();
+            }
+        });
+    });
 }
 
-// 带重试的fetch函数
-async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
-    // 检查缓存
-    if (requestCache.has(url)) {
-        return requestCache.get(url);
-    }
+// 修改 setupSearchSuggestions 函数，添加搜索按钮功能
+function setupSearchSuggestions() {
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.createElement('button');
+    let debounceTimer;
+    
+    // 创建并添加搜索按钮
+    searchButton.className = 'search-button';
+    searchButton.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M9 17A8 8 0 1 1 9 1a8 8 0 0 1 0 16zm0-2A6 6 0 1 0 9 3a6 6 0 0 0 0 12z" fill="currentColor"/>
+            <path d="M13.5 13.5L19 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    `;
+    
+    // 将搜索按钮添加到搜索框容器中
+    const searchContainer = searchInput.parentElement;
+    searchContainer.style.position = 'relative';
+    searchContainer.appendChild(searchButton);
+    
+    // 添加搜索按钮点击事件
+    searchButton.addEventListener('click', () => {
+        searchPokemon();
+    });
+    
+    // 原有的输入事件处理
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        
+        const searchText = e.target.value.toLowerCase().trim();
+        
+        if (!searchText) {
+            document.getElementById('result').innerHTML = '<p class="search-hint">请输入宝可梦名称或ID进行搜索</p>';
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            if (!pokemonList.length) {
+                document.getElementById('result').innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><p>正在加载宝可梦数据...</p></div>';
+                return;
+            }
+
+            const matchedPokemon = pokemonList.filter(pokemon => {
+                return pokemon.id.toString().includes(searchText) ||
+                       pokemon.chinese_name.toLowerCase().includes(searchText) ||
+                       pokemon.name.toLowerCase().includes(searchText);
+            });
+
+            if (matchedPokemon.length > 0) {
+                displayPokemonList(matchedPokemon);
+            } else {
+                document.getElementById('result').innerHTML = '<p class="no-results">未找到匹配的宝可梦</p>';
+            }
+        }, 200);
+    });
+}
+
+// 3. 优化数据加载
+async function fetchWithRetry(url, retries = 3) {
+    const cached = cache.get(url, 'pokemon');
+    if (cached) return cached;
 
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
-            // 存入缓存
-            requestCache.set(url, data);
+            cache.set(url, 'pokemon', data);
             return data;
         } catch (error) {
             if (i === retries - 1) throw error;
-            await delay(delayMs * (i + 1)); // 递增延迟时间
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
         }
     }
 }
@@ -372,40 +441,43 @@ async function searchPokemon(nameOrId = '') {
     }
 
     try {
-        // 显示加载提示
-        resultDiv.innerHTML = '<p>正在加载宝可梦详细信息，请稍候...</p>';
+        showLoadingState('正在加载宝可梦详细信息...');
         
-        // 直接尝试搜索，不等待完整列表初始化
+        // 尝试从缓存的列表中查找宝可梦
         let searchTerm = searchInput;
+        let foundPokemon = null;
         
-        // 如果是数字ID，直接使用
-        if (!isNaN(searchInput)) {
-            searchTerm = searchInput;
-        } else if (isInitialized) {
-            // 如果列表已初始化，尝试查找匹配的宝可梦
-            const foundPokemon = pokemonList.find(pokemon => 
+        // 如果不是数字ID，尝试通过名称查找
+        if (isNaN(searchInput)) {
+            foundPokemon = pokemonList.find(pokemon => 
                 pokemon.chinese_name.toLowerCase() === searchInput ||
-                pokemon.name.toLowerCase() === searchInput
+                pokemon.name.toLowerCase() === searchInput ||
+                pokemon.chinese_name.toLowerCase().includes(searchInput) ||
+                pokemon.name.toLowerCase().includes(searchInput)
             );
-
+            
             if (foundPokemon) {
                 searchTerm = foundPokemon.name;
             }
         }
 
-        // 继续原有的获取宝可梦详细信息的逻辑
+        // 获取宝可梦详细信息
         const data = await fetchWithRetry(`https://pokeapi.co/api/v2/pokemon/${searchTerm}/`);
-
-        // 获取宝可梦的详细种族信息
+        
+        // 如果已经找到中文名称，直接使用
+        if (foundPokemon) {
+            data.chinese_name = foundPokemon.chinese_name;
+        }
+        
+        // 继续获取其他详细信息...
         const speciesData = await fetchWithRetry(data.species.url);
-
-        // 获取中文名称
-        const chineseName = speciesData.names.find(
-            name => name.language.name === 'zh-Hans'
-        )?.name || data.name;
-
-        // 缓存宝可梦名称
-        pokemonNameCache.set(data.name, chineseName);
+        
+        // 如果没有找到中文名称，从species数据中获取
+        if (!data.chinese_name) {
+            data.chinese_name = speciesData.names.find(
+                name => name.language.name === 'zh-Hans'
+            )?.name || data.name;
+        }
 
         // 获取中文描述
         const chineseDescription = speciesData.flavor_text_entries.find(
@@ -460,7 +532,7 @@ async function searchPokemon(nameOrId = '') {
         currentPokemonData = {
             data: {
                 ...data,
-                chinese_name: chineseName
+                chinese_name: data.chinese_name
             },
             speciesData: speciesData,
             abilities: abilities,
@@ -487,7 +559,8 @@ async function searchPokemon(nameOrId = '') {
             initializePokemonList();
         }
     } catch (error) {
-        resultDiv.innerHTML = `<p class="error">${error.message}</p>`;
+        console.error('搜索宝可梦失败:', error);
+        showError(`搜索失败: ${error.message}`);
     }
 }
 
@@ -707,43 +780,107 @@ function renderStats(stats, totalStats) {
     `;
 }
 
-// 修改渲染宝可梦卡片的函数
-function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
-    const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
-
-    const evolutionChainHTML = `
-        <div class="evolution-chain">
-            ${currentPokemonData.evolutionChain.map((pokemon, index, array) => `
-                <div class="evolution-stage ${pokemon.id === data.id ? 'current' : ''}" 
-                     onclick="searchPokemon('${pokemon.name}')">
-                    <img src="${pokemon.sprite}" alt="${pokemon.chinese_name}">
-                    <p>${pokemon.chinese_name}</p>
-                    ${pokemon.evolution_details.length > 0 ? 
-                        `<p class="evolution-condition">${pokemon.evolution_details.join(', ')}</p>` : ''}
-                </div>
-                ${index < array.length - 1 ? `
-                    <div class="evolution-arrow">
-                        ➜
-                    </div>
-                ` : ''}
-            `).join('')}
+// 4. 添加加载状态指示器
+function showLoadingState(message = '正在加载...') {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = `
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>${message}</p>
         </div>
     `;
+}
 
-    // 修改种族信息和遭遇地点的 HTML
-    const speciesAndEncountersHTML = `
-        <div class="clearfix">
-            <div class="species-info">
-                <h3>种族信息:</h3>
-                <p>栖息地: ${speciesData.habitat ? habitatTranslations[speciesData.habitat.name] || speciesData.habitat.name : '未知'}</p>
-                <p>捕获率: ${speciesData.capture_rate}</p>
-                <p>基础经验值: ${data.base_experience}</p>
-                <p>性别比例: ${speciesData.gender_rate === -1 ? '无性别' : 
-                    `雌性 ${(speciesData.gender_rate / 8) * 100}%, 雄性 ${((8 - speciesData.gender_rate) / 8) * 100}%`}</p>
+// 5. 优化渲染性能
+function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
+    // 使用DocumentFragment提高渲染性能
+    const fragment = document.createDocumentFragment();
+    const card = document.createElement('div');
+    card.className = 'pokemon-card';
+    
+    // 计算总种族值
+    const totalStats = data.stats.reduce((sum, stat) => sum + stat.base_stat, 0);
+    
+    // 构建完整的HTML结构
+    card.innerHTML = `
+        <div class="pokemon-header">
+            <div class="pokemon-id">#${String(data.id).padStart(3, '0')}</div>
+            <h2 class="pokemon-name">${data.chinese_name}</h2>
+            <div class="pokemon-types">
+                ${data.types.map(type => `
+                    <span class="type-badge ${type.type.name}">
+                        ${typeTranslations[type.type.name] || type.type.name}
+                    </span>
+                `).join('')}
+            </div>
+        </div>
+
+        <div class="pokemon-content">
+            <!-- 图片展示区 -->
+            <div class="pokemon-images">
+                <div class="main-image">
+                    <img src="${data.sprites.other['official-artwork'].front_default || data.sprites.front_default}" 
+                         alt="${data.chinese_name}" 
+                         class="pokemon-artwork">
+                </div>
+                <div class="sprite-variants">
+                    <img src="${data.sprites.front_default}" alt="${data.chinese_name} 正面">
+                    <img src="${data.sprites.back_default}" alt="${data.chinese_name} 背面">
+                    ${data.sprites.front_shiny ? 
+                        `<img src="${data.sprites.front_shiny}" alt="${data.chinese_name} 闪光">` : ''}
+                </div>
             </div>
 
-            <div class="encounters">
-                <h3>遭遇地点:</h3>
+            <!-- 描述信息 -->
+            <div class="pokemon-description">
+                <p>${chineseDescription ? chineseDescription.flavor_text.replace(/\f/g, ' ') : '暂无描述'}</p>
+            </div>
+
+            <!-- 基本信息 -->
+            <div class="basic-info-container module-section">
+                <h3>基本信息</h3>
+                <div class="basic-info">
+                    <p>身高: ${data.height/10} m</p>
+                    <p>体重: ${data.weight/10} kg</p>
+                    <p>捕获率: ${speciesData.capture_rate}</p>
+                    <p>基础经验值: ${data.base_experience}</p>
+                    <p>性别比例: ${speciesData.gender_rate === -1 ? '无性别' : 
+                        `雌性 ${(speciesData.gender_rate / 8) * 100}%, 雄性 ${((8 - speciesData.gender_rate) / 8) * 100}%`}</p>
+                </div>
+            </div>
+
+            <!-- 特性信息 -->
+            <div class="abilities module-section">
+                <h3>特性</h3>
+                ${abilities.map(ability => `
+                    <div class="ability">
+                        <h4>${ability.name} ${ability.is_hidden ? '(隐藏特性)' : ''}</h4>
+                        <p class="ability-description">${ability.description}</p>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- 种族值 -->
+            ${renderStats(data.stats, totalStats)}
+
+            <!-- 进化链 -->
+            <div class="evolution-chain module-section">
+                <h3>进化链</h3>
+                ${currentPokemonData.evolutionChain.map((pokemon, index, array) => `
+                    <div class="evolution-stage ${pokemon.id === data.id ? 'current' : ''}" 
+                         onclick="searchPokemon('${pokemon.name}')">
+                        <img src="${pokemon.sprite}" alt="${pokemon.chinese_name}">
+                        <p>${pokemon.chinese_name}</p>
+                        ${pokemon.evolution_details.length > 0 ? 
+                            `<p class="evolution-condition">${pokemon.evolution_details.join(', ')}</p>` : ''}
+                    </div>
+                    ${index < array.length - 1 ? '<div class="evolution-arrow">➜</div>' : ''}
+                `).join('')}
+            </div>
+
+            <!-- 遭遇地点 -->
+            <div class="encounters module-section">
+                <h3>遭遇地点</h3>
                 ${currentPokemonData.encounters && Object.keys(currentPokemonData.encounters).length > 0 ? `
                     <select class="version-select" onchange="showVersionEncounters(this.value)">
                         <option value="">选择游戏版本</option>
@@ -754,130 +891,85 @@ function renderPokemonCard(data, speciesData, abilities, chineseDescription) {
                     <div class="encounter-locations" id="encounterLocations"></div>
                 ` : '<p>无野外遭遇地点数据</p>'}
             </div>
-        </div>
-    `;
 
-    // 计算总种族值
-    const totalStats = data.stats.reduce((sum, stat) => sum + stat.base_stat, 0);
-    
-    // 使用新的渲染函数
-    const statsHTML = renderStats(data.stats, totalStats);
-
-    // 使用新的renderMovesTable函数
-    const movesTableHTML = renderMovesTable(currentMoves, currentPage, totalPages);
-
-    const pokemonCard = `
-        <div class="pokemon-card">
-            ${evolutionChainHTML}
-            <div class="basic-info-section">
-                <div class="pokemon-images">
-                    <img src="${data.sprites.front_default}" alt="${data.chinese_name} 正面">
-                    <img src="${data.sprites.back_default}" alt="${data.chinese_name} 背面">
-                    ${data.sprites.front_shiny ? 
-                      `<img src="${data.sprites.front_shiny}" alt="${data.chinese_name} 闪光">` : ''}
-                </div>
-                
-                <h2>${data.chinese_name}</h2>
-                
-                <div class="pokemon-description">
-                    <p>${chineseDescription ? chineseDescription.flavor_text.replace(/\f/g, ' ') : '暂无描述'}</p>
-                </div>
-
-                <div class="basic-info-container module-section">
-                    <div class="basic-info">
-                        <p>图鉴编号: #${data.id.toString().padStart(3, '0')}</p>
-                        <p>属性: ${data.types.map(type => typeTranslations[type.type.name] || type.type.name).join(', ')}</p>
-                        <p>身高: ${data.height/10} m</p>
-                        <p>体重: ${data.weight/10} kg</p>
-                    </div>
-
-                    <div class="stats">
-                        <table class="stats-table">
-                            <tbody>
-                                ${data.stats.map(stat => {
-                                    const maxValue = 255;
-                                    const percentage = (stat.base_stat / maxValue) * 100;
-                                    const statName = translateStatName(stat.stat.name);
-                                    const calculator = statName === 'HP' ? STAT_CALC.HP : STAT_CALC.OTHER;
-                                    
-                                    const lv50Min = calculator.min(stat.base_stat, 50);
-                                    const lv50Max = calculator.max(stat.base_stat, 50);
-                                    const lv100Min = calculator.min(stat.base_stat, 100);
-                                    const lv100Max = calculator.max(stat.base_stat, 100);
-
-                                    return `
-                                        <tr>
-                                            <td>${statName}: ${stat.base_stat}</td>
-                                            <td class="stat-bar-cell">
-                                                <div class="stat-bar-container">
-                                                    <div class="stat-bar ${statColors[stat.stat.name]}" 
-                                                         style="width: ${percentage}%"></div>
-                                                </div>
-                                            </td>
-                                            <td class="stat-range-cell">
-                                                ${lv50Min}-${lv50Max} | ${lv100Min}-${lv100Max}
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
+            <!-- 可学会的技能 -->
+            <div class="moves module-section">
+                <h3>可学会的技能</h3>
+                <div class="moves-list">
+                    <table class="moves-table">
+                        <thead>
+                            <tr>
+                                <th>技能名称</th>
+                                <th>属性</th>
+                                <th>威力</th>
+                                <th>命中</th>
+                                <th>PP值</th>
+                                <th>效果</th>
+                                <th>获得方式</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${currentMoves.map(move => `
                                 <tr>
-                                    <td>总和: ${totalStats}</td>
-                                    <td colspan="2"></td>
+                                    <td>${move.name}</td>
+                                    <td>${move.type}</td>
+                                    <td>${move.power}</td>
+                                    <td>${move.accuracy}</td>
+                                    <td>${move.pp}</td>
+                                    <td>${move.description}</td>
+                                    <td>${move.learnMethods}</td>
                                 </tr>
-                            </tbody>
-                        </table>
-                        <div class="stat-description">
-                            <p>• 最小能力值以基础点数、个体值均为0，以及性格降低能力值计算。</p>
-                            <p>• 最大能力值以基础点数为252，个体值为31，以及性格增加能力值计算。</p>
-                        </div>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="pagination">
+                        <button class="page-first" onclick="changePage(1)">首页</button>
+                        <button class="page-prev" onclick="changePage(${currentPage - 1})">上一页</button>
+                        <span class="pagination-info">
+                            第 ${currentPage}/${Math.ceil(data.moves.length / 10)} 页
+                        </span>
+                        <button class="page-next" onclick="changePage(${currentPage + 1})">下一页</button>
+                        <button class="page-last" onclick="changePage(${Math.ceil(data.moves.length / 10)})">末页</button>
                     </div>
                 </div>
-
-                <div class="abilities module-section">
-                    <h3>特性:</h3>
-                    ${abilities.map(ability => `
-                        <div class="ability">
-                            <p>${ability.name} ${ability.is_hidden ? '(隐藏特性)' : ''}</p>
-                            <p class="ability-description">${ability.description}</p>
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div class="info-section module-section">
-                    ${speciesAndEncountersHTML}
-                </div>
-                
-                ${movesTableHTML}
             </div>
         </div>
     `;
-
-    document.getElementById('result').innerHTML = pokemonCard;
     
-    // 在DOM更新后绑定分页按钮事件
-    setTimeout(() => {
-        const paginationButtons = document.querySelectorAll('.pagination button');
-        paginationButtons.forEach(button => {
-            // 移除所有现有事件监听器
-            const newButton = button.cloneNode(true);
-            button.parentNode.replaceChild(newButton, button);
-            
-            // 根据按钮类名设置新的点击事件
-            if (newButton.classList.contains('page-first')) {
-                newButton.addEventListener('click', () => changePage(1));
-            } else if (newButton.classList.contains('page-prev')) {
-                newButton.addEventListener('click', () => changePage(currentPage - 1));
-            } else if (newButton.classList.contains('page-next')) {
-                newButton.addEventListener('click', () => changePage(currentPage + 1));
-            } else if (newButton.classList.contains('page-last')) {
-                const totalPages = Math.ceil(currentPokemonData.data.moves.length / 10);
-                newButton.addEventListener('click', () => changePage(totalPages));
-            }
-        });
-        
-        console.log('分页按钮事件已绑定');
-    }, 100);
+    fragment.appendChild(card);
+    document.getElementById('result').innerHTML = '';
+    document.getElementById('result').appendChild(fragment);
 }
+
+// 6. 添加错误处理和用户反馈
+function showError(message, retryCallback = null) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = `
+        <div class="error-container">
+            <p class="error-message">${message}</p>
+            ${retryCallback ? `
+                <button class="retry-button" onclick="${retryCallback}">
+                    重试
+                </button>
+            ` : ''}
+        </div>
+    `;
+}
+
+// 7. 添加性能监控
+const performance = {
+    startTime: 0,
+    
+    start() {
+        this.startTime = performance.now();
+    },
+    
+    end(operation) {
+        const duration = performance.now() - this.startTime;
+        console.log(`${operation} 耗时: ${duration.toFixed(2)}ms`);
+        return duration;
+    }
+};
 
 // 修改能力值名称翻译函数
 function translateStatName(name) {
@@ -1001,86 +1093,6 @@ async function processEvolutionChain(chain) {
     return processedChain;
 }
 
-// 添加搜索建议相关的代码
-function setupSearchSuggestions() {
-    const searchInput = document.getElementById('searchInput');
-    const searchContainer = document.querySelector('.search-container');
-    
-    // 创建建议列表容器
-    const suggestionsDiv = document.createElement('div');
-    suggestionsDiv.className = 'search-suggestions';
-    searchContainer.appendChild(suggestionsDiv);
-
-    // 添加输入事件监听器
-    searchInput.addEventListener('input', function(e) {
-        const searchText = e.target.value.toLowerCase();
-        
-        // 如果输入为空，隐藏建议列表
-        if (!searchText) {
-            suggestionsDiv.style.display = 'none';
-            return;
-        }
-
-        // 过滤匹配的宝可梦
-        const suggestions = pokemonList.filter(pokemon => 
-            pokemon.chinese_name.toLowerCase().includes(searchText) ||
-            pokemon.name.toLowerCase().includes(searchText)
-        ).slice(0, 10); // 限制显示前10个结果
-
-        // 显示建议列表
-        if (suggestions.length > 0) {
-            suggestionsDiv.style.display = 'block';
-            suggestionsDiv.innerHTML = suggestions.map(pokemon => `
-                <div class="suggestion-item" onclick="selectPokemon('${pokemon.name}')">
-                    ${pokemon.chinese_name} (${pokemon.name})
-                </div>
-            `).join('');
-        } else {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-
-    // 点击其他地方时隐藏建议列表
-    document.addEventListener('click', function(e) {
-        if (!searchContainer.contains(e.target)) {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-
-    // 添加键盘导航
-    searchInput.addEventListener('keydown', function(e) {
-        const items = suggestionsDiv.getElementsByClassName('suggestion-item');
-        const activeItem = suggestionsDiv.querySelector('.suggestion-item:hover');
-        
-        if (items.length === 0) return;
-
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            let nextItem;
-
-            if (!activeItem) {
-                nextItem = e.key === 'ArrowDown' ? items[0] : items[items.length - 1];
-            } else {
-                const currentIndex = Array.from(items).indexOf(activeItem);
-                if (e.key === 'ArrowDown') {
-                    nextItem = items[currentIndex + 1] || items[0];
-                } else {
-                    nextItem = items[currentIndex - 1] || items[items.length - 1];
-                }
-            }
-
-            if (nextItem) {
-                Array.from(items).forEach(item => item.classList.remove('active'));
-                nextItem.classList.add('active');
-                nextItem.scrollIntoView({ block: 'nearest' });
-            }
-        } else if (e.key === 'Enter' && activeItem) {
-            e.preventDefault();
-            activeItem.click();
-        }
-    });
-}
-
 // 添加选择宝可梦的函数
 function selectPokemon(name) {
     document.getElementById('searchInput').value = name;
@@ -1090,7 +1102,21 @@ function selectPokemon(name) {
 
 // 在页面加载时开始初始化宝可梦列表，但不阻塞用户操作
 window.addEventListener('load', () => {
-    // 延迟一秒开始加载，让页面先完成渲染
+    const cached = localStorage.getItem('pokemonList');
+    if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const now = Date.now();
+        
+        // 检查数据是否过期（24小时）
+        if (now - timestamp < 24 * 60 * 60 * 1000) {
+            pokemonList = data;
+            isInitialized = true;
+            setupSearchSuggestions();
+            return;
+        }
+    }
+    
+    // 如果没有缓存数据或数据已过期，重新加载
     setTimeout(initializePokemonList, 1000);
 });
 
@@ -1327,137 +1353,41 @@ document.addEventListener('DOMContentLoaded', function() {
     switchView('pokemon');
 });
 
-// 修改 switchView 函数
-function switchView(viewType) {
-    const contentContainer = document.querySelector('.content-container');
+// 修改 switchView 函数，确保正确调用物品图鉴和浆果图鉴功能
+
+function switchView(view) {
+    const resultElement = document.getElementById('result');
+    const searchContainer = document.querySelector('.search-container');
+    const contentTitle = document.querySelector('.content-container h1');
     
-    // 更新菜单项的激活状态
-    document.querySelectorAll('.menu-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('data-view') === viewType) {
-            item.classList.add('active');
-        }
-    });
+    // 清空结果区域
+    resultElement.innerHTML = '';
     
-    switch(viewType) {
+    // 根据视图类型切换内容
+    switch(view) {
         case 'pokemon':
-            contentContainer.innerHTML = `
-                <h1>宝可梦图鉴</h1>
-                <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="输入宝可梦ID或名称">
-                    <button id="searchButton" onclick="searchPokemon()">搜索</button>
-                    <div class="search-suggestions" id="searchSuggestions"></div>
-                </div>
-                <div id="result"></div>
-            `;
-            setupSearchSuggestions();
+            contentTitle.textContent = '宝可梦图鉴';
+            searchContainer.style.display = 'block';
             break;
-            
         case 'berry':
-            contentContainer.innerHTML = `
-                <h1>浆果图鉴</h1>
-                <div class="berry-grid" id="berryGrid"></div>
-            `;
-            loadBerryList();
+            contentTitle.textContent = '浆果图鉴';
+            searchContainer.style.display = 'none';
+            // 检查浆果图鉴函数是否存在并可调用
+            if (typeof initBerryDex === 'function') {
+                initBerryDex();
+            } else {
+                resultElement.innerHTML = '<div class="error">浆果图鉴功能尚未实现</div>';
+            }
             break;
-    }
-}
-
-// 修改浆果加载函数
-async function loadBerryList() {
-    const berryGrid = document.getElementById('berryGrid');
-    berryGrid.innerHTML = '<p>正在加载浆果数据...</p>';
-
-    try {
-        const response = await fetch('https://pokeapi.co/api/v2/berry?limit=64');
-        const data = await response.json();
-
-        const berryDetails = await Promise.all(
-            data.results.map(async (berry) => {
-                const berryResponse = await fetch(berry.url);
-                return berryResponse.json();
-            })
-        );
-
-        berryGrid.innerHTML = berryDetails.map(berry => `
-            <div class="berry-card" onclick="showBerryDetail(${berry.id})">
-                <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berries/${berry.name}-berry.png" 
-                     alt="${berry.name}" 
-                     onerror="this.src='path/to/fallback-image.png'">
-                <p>${berryTranslations[berry.name] || berry.name}</p>
-                <p class="berry-id">ID: ${berry.id}</p>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        console.error('加载浆果数据失败:', error);
-        berryGrid.innerHTML = '<p>加载浆果数据失败，请稍后重试</p>';
-    }
-}
-
-// 修改浆果详情显示函数
-async function showBerryDetail(berryId) {
-    const contentContainer = document.querySelector('.content-container');
-    contentContainer.innerHTML = '<p>正在加载浆果详情...</p>';
-
-    try {
-        const response = await fetch(`https://pokeapi.co/api/v2/berry/${berryId}/`);
-        const berry = await response.json();
-
-        const itemResponse = await fetch(`https://pokeapi.co/api/v2/item/${berry.item.name}/`);
-        const itemData = await itemResponse.json();
-
-        // 使用翻译对象获取中文名称
-        const chineseName = berryTranslations[berry.name] || berry.name;
-        const chineseDescription = itemData.flavor_text_entries.find(
-            entry => entry.language.name === 'zh-Hans'
-        )?.text || '暂无描述';
-
-        contentContainer.innerHTML = `
-            <div class="berry-detail-card">
-                <div class="berry-header">
-                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berries/${berry.name}-berry.png" 
-                         alt="${berry.name}" 
-                         class="berry-image">
-                    <h2>${chineseName}</h2>
-                    <span class="berry-id">ID: ${berry.id}</span>
-                </div>
-                
-                <div class="berry-info-section">
-                    <div class="berry-basic-info">
-                        <h3>基本信息</h3>
-                        <table class="berry-info-table">
-                            <tr>
-                                <td>生长时间</td>
-                                <td>${berry.growth_time * 4}小时</td>
-                            </tr>
-                            <tr>
-                                <td>最大数量</td>
-                                <td>${berry.max_harvest}</td>
-                            </tr>
-                            <tr>
-                                <td>大小</td>
-                                <td>${berry.size}毫米</td>
-                            </tr>
-                            <tr>
-                                <td>硬度</td>
-                                <td>${berry.firmness.name}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="berry-description">
-                    <h3>描述</h3>
-                    <p>${chineseDescription}</p>
-                </div>
-
-                <button class="back-button" onclick="switchView('berry')">返回浆果列表</button>
-            </div>
-        `;
-
-    } catch (error) {
-        console.error('加载浆果详情失败:', error);
-        contentContainer.innerHTML = '<p>加载浆果详情失败，请稍后重试</p>';
+        case 'item':
+            contentTitle.textContent = '物品图鉴';
+            searchContainer.style.display = 'none';
+            // 检查物品图鉴函数是否存在并可调用
+            if (typeof initItemDex === 'function') {
+                initItemDex();
+            } else {
+                resultElement.innerHTML = '<div class="error">物品图鉴功能尚未实现</div>';
+            }
+            break;
     }
 }
