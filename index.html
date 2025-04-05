@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网址导航</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<script>
+	let isdevtoolsopen = false;
+	const starttime = Date.now();
+	checkdebugger();
+	function checkdebugger() {
+	debugger;// 当开发者工具打开且处于调试模式时，执行会暂停。
+	const endtime = Date.now();
+	if (endtime - starttime >100) { // 假设暂停超过100ms则判断为打开了开发者工具。
+		isdevtoolsopen = true;
+	    window.close();
+	    window.location = "about:blank";
+	}
+	}
+	   let h = window.innerHeight;
+	    let w = window.innerWidth;
+	
+	    //禁用右键
+	    document.oncontextmenu = function () { return false; };
+	
+	    
+	
+	    //禁用开发者工具F12
+	    document.onkeydown = function () {
+	        if (window.event && window.event.keyCode == 123) {
+	            event.keyCode = 0;
+	            event.returnValue = false;
+	            return false;
+	        }
+	        if (window.event.ctrlKey && window.event.shiftKey) {
+	             event.keyCode = 0;
+				event.returnValue = false;
+	            return false;
+	        }
+	    };
+	
+	    document.oncontextmenu = function () {
+			 event.keyCode = 0;
+			event.returnValue = false;
+			return false;
+	    };
+	    //如果用户在工具栏调起开发者工具，那么判断浏览器的可视高度和可视宽度是否有改变，如有改变则关闭本页面  
+	    window.onresize = function () {
+	        // 检查是否为移动设备
+	        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+	            return; // 在移动设备上不执行检测
+	        }
+	        
+	        if (h != window.innerHeight || w != window.innerWidth) {
+	            window.close();
+	            window.location = "about:blank";
+	        }
+	    }
+</script>
+<body>
+    <input type="file" id="wallpaperInput" accept="image/*" style="display: none;">
+    <div id="weather-widget" class="weather-widget" style="display: none;">
+        <span id="location"></span>
+        <span id="temperature"></span>
+        <span id="weather-desc"></span>
+    </div>
+    <button class="settings-btn" onclick="toggleSettings()">
+        ⚙️ 设置
+    </button>
+    <div class="settings-dropdown" id="settingsDropdown">
+        <div class="settings-item" onclick="document.getElementById('wallpaperInput').click()">
+            🖼️ 更换壁纸
+        </div>
+        <div class="settings-item" onclick="clearWallpaper()">
+            🗑️ 清除壁纸
+        </div>
+        <div class="settings-item" onclick="toggleDarkMode()">
+            <span id="darkModeIcon">🌞</span> <span id="darkModeText">切换夜间模式</span>
+        </div>
+        <div class="settings-item" onclick="toggleSystemTheme()">
+            <span id="systemThemeIcon">🌗</span> <span id="systemThemeText">跟随系统</span>
+        </div>
+        <div class="settings-item" onclick="toggleWeather()">
+            <span id="weatherIcon">🌤️</span> <span id="weatherText">显示天气</span>
+        </div>
+        <div class="settings-item" onclick="exportSettings()">
+            💾 导出配置
+        </div>
+        <div class="settings-item">
+            📂 导入配置
+            <input type="file" id="importInput" accept=".json" style="display: none;" onchange="importSettings(event)">
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div class="search-container">
+                <select class="search-engine-select" id="searchEngine">
+                    <option value="https://www.bing.com/search?q=">必应</option>
+                    <option value="https://www.google.com/search?q=">谷歌</option>
+                    <option value="https://www.baidu.com/s?wd=">百度</option>
+                    
+                </select>
+                <input type="text" class="search-input" id="searchInput" placeholder="输入关键词搜索...">
+                <button class="search-button" onclick="search()">搜索</button>
+            </div>
+        </header>
+
+        <section class="nav-section">
+            <div class="nav-section-header">
+                <h2>常用网址</h2>
+                <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
+            </div>
+            <div class="nav-grid collapsed">
+                <a href="https://desireblog.cn/" class="nav-item" target="_blank">
+                    作者博客
+                </a>
+                <a href="https://kimi.moonshot.cn/" class="nav-item" target="_blank">
+                    kimi
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="https://www.github.com" class="nav-item" target="_blank">
+                    GitHub
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="https://www.bilibili.com" class="nav-item" target="_blank">
+                    哔哩哔哩
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <div class="add-site-btn" onclick="showAddSiteModal(this)">
+                    + 添加网址
+                </div>
+            </div>
+        </section>
+        <section class="nav-section">
+            <div class="nav-section-header">
+                <h2>实用工具</h2>
+                <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
+            </div>
+            <div class="nav-grid collapsed">
+                <a href="tools/QRcode.html" class="nav-item" target="_blank">
+                    二维码生成识别
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="https://dnd-resume.com" class="nav-item" target="_blank">
+                    简历生成器
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="tools/AI.html" class="nav-item" target="_blank">
+                    AI助手
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="tools/Pokemon.html" class="nav-item" target="_blank">
+                    宝可梦图鉴
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <a href="tools/1A2B.html" class="nav-item" target="_blank">
+                    1A2B游戏
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <div class="add-site-btn" onclick="showAddSiteModal(this)">
+                    + 添加网址
+                </div>
+            </div>
+        </section>
+
+        <section class="nav-section">
+            <div class="nav-section-header">
+                <h2>学习资源</h2>
+                <button class="toggle-btn" onclick="toggleGrid(this)">展开更多</button>
+            </div>
+            <div class="nav-grid collapsed">
+                <a href="https://www.w3school.com.cn" class="nav-item" target="_blank">
+                    W3School
+                    <button class="delete-btn" onclick="deleteSite(this, event)"></button>
+                </a>
+                <div class="add-site-btn" onclick="showAddSiteModal(this)">
+                    + 添加网址
+                </div>
+            </div>
+        </section>
+
+
+    </div>
+
+    <div class="modal" id="addSiteModal">
+        <div class="modal-content">
+            <h3>添加新网址</h3>
+            <input type="text" id="siteName" placeholder="网站名称">
+            <input type="url" id="siteUrl" placeholder="网站地址">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn confirm" onclick="addNewSite()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

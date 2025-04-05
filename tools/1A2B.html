@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1A2B猜数字游戏</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #1a73e8;
+        }
+        .game-controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        input {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+        }
+        button {
+            padding: 8px 16px;
+            font-size: 16px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        .history {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .history-item {
+            margin: 5px 0;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        #message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>1A2B猜数字游戏</h1>
+        <p>规则：系统会随机生成一个4位不重复的数字，你需要猜出这个数字。每次猜测后，系统会给出提示：</p>
+        <ul>
+            <li>A表示数字和位置都正确的个数</li>
+            <li>B表示数字正确但位置错误的个数</li>
+        </ul>
+        <div class="game-controls">
+            <input type="text" id="guess" maxlength="4" placeholder="输入4位不重复数字">
+            <button onclick="makeGuess()">猜！</button>
+            <button onclick="newGame()">新游戏</button>
+        </div>
+        <div id="message"></div>
+        <div class="history">
+            <h3>猜测历史</h3>
+            <div id="history-list"></div>
+        </div>
+    </div>
+    <script src="./js/1A2B.js"></script>
+</body>
+</html>
