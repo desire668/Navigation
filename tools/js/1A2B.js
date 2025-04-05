@@ -11,7 +11,6 @@ function generateAnswer() {
         numbers.splice(randomIndex, 1);
     }
     guessCount = 0;
-    console.log('答案已生成：', answer.join('')); // 用于调试
 }
 
 // 检查输入是否合法（4位不重复数字）
