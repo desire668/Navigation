@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角洲随机抽取</title>
+    <link rel="stylesheet" href="./css/sanjiaozhou.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>三角洲随机抽取</h1>
+        </header>
+        
+        <main>
+            <div class="control-panel">
+                <div class="filter-options">
+                    <label>地图筛选：</label>
+                    <select id="map-filter">
+                        <option value="all">全部地图</option>
+                        <option value="secret">仅机密地图</option>
+                        <option value="top-secret">仅绝密地图</option>
+                    </select>
+                </div>
+                <div class="buttons">
+                    <button id="randomize-btn">随机抽取</button>
+                    <button id="reset-btn">重置</button>
+                </div>
+            </div>
+            
+            <div class="result-container">
+                <div class="result-section">
+                    <h2>干员</h2>
+                    <div class="result-item" id="agent-result">
+                        <img id="agent-img" src="" alt="干员图片">
+                        <p id="agent-name">点击随机抽取按钮开始</p>
+                    </div>
+                </div>
+                
+                <div class="result-section">
+                    <h2>护甲</h2>
+                    <div class="result-item" id="armor-result">
+                        <img id="armor-img" src="" alt="护甲图片">
+                        <p id="armor-name">点击随机抽取按钮开始</p>
+                    </div>
+                </div>
+                
+                <div class="result-section">
+                    <h2>头盔</h2>
+                    <div class="result-item" id="helmet-result">
+                        <img id="helmet-img" src="" alt="头盔图片">
+                        <p id="helmet-name">点击随机抽取按钮开始</p>
+                    </div>
+                </div>
+                
+                <div class="result-section">
+                    <h2>武器</h2>
+                    <div class="result-item" id="weapon-result">
+                        <img id="weapon-img" src="" alt="武器图片">
+                        <p id="weapon-name">点击随机抽取按钮开始</p>
+                    </div>
+                </div>
+                
+                <div class="result-section">
+                    <h2>地图</h2>
+                    <div class="result-item" id="map-result">
+                        <p id="map-name">点击随机抽取按钮开始</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>三角洲随机抽取</p>
+        </footer>
+    </div>
+    
+    <script src="./js/sanjiaozhou.js"></script>
+</body>
+</html>
